@@ -11,9 +11,7 @@ use bevy_egui::{egui, EguiContext, EguiPlugin, EguiSettings};
 mod editors;
 mod model;
 mod persistence;
-use editors::*;
-use model::*;
-use persistence::PersistencePlugin;
+mod player;
 
 use crate::persistence::PersistenceEvent;
 
@@ -23,11 +21,12 @@ pub fn main() {
             level: Level::DEBUG,
             ..Default::default()
         })
-        .insert_resource(EguiSettings { scale_factor: 1.2 })
+        .insert_resource(EguiSettings { scale_factor: 2.0 })
         .add_plugins(DefaultPlugins)
         .add_plugin(EguiPlugin)
-        .add_plugin(PersistencePlugin)
-        .add_plugin(EditorsPlugin)
+        .add_plugin(persistence::PersistencePlugin)
+        .add_plugin(editors::EditorsPlugin)
+        .add_plugin(player::PlayerPlugin)
         .add_startup_system(on_startup.system())
         .add_system(debug.system())
         .run();
@@ -40,12 +39,17 @@ fn on_startup(mut _commands: Commands, mut persistence: EventWriter<PersistenceE
 
 fn debug(
     egui_context: ResMut<EguiContext>,
-    mut _commands: Commands,
+    mut commands: Commands,
     mut app_exit: EventWriter<AppExit>,
 ) {
     egui::Window::new("Main menu").show(egui_context.ctx(), |ui| {
         if ui.button("Quit").clicked() {
             app_exit.send(AppExit);
         }
+
+        if ui.button("Start").clicked() {
+            commands.insert_resource(player::StartPrompt("".into()));
+        }
+
     });
 }
