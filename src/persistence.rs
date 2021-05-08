@@ -53,7 +53,7 @@ fn handler(
                 info!("Writing to file!");
                 let slides: Vec<Slide> = slides.iter().map(|(_, slide)| slide).cloned().collect();
                 let f = File::create(file_path()).expect("Failed to write to slides file");
-                serde_json::to_writer(f, &slides).expect("Failed to rialize to slides files");
+                serde_json::to_writer_pretty(f, &slides).expect("Failed to rialize to slides files");
                 info!("Wrote {} slides", slides.len());
             }
         }
