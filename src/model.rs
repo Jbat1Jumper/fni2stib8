@@ -20,7 +20,7 @@ impl Slide {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Default)]
 pub struct Action {
     pub text: String,
     pub target_slide: String,

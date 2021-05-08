@@ -8,12 +8,14 @@ use bevy::prelude::*;
 //use bevy::render::camera::OrthographicProjection;
 use bevy_egui::{egui, EguiContext, EguiPlugin, EguiSettings};
 
+mod editors;
 mod model;
 mod persistence;
-mod editors;
-use model::*;
 use editors::*;
+use model::*;
 use persistence::PersistencePlugin;
+
+use crate::persistence::PersistenceEvent;
 
 pub fn main() {
     App::build()
@@ -21,20 +23,19 @@ pub fn main() {
             level: Level::DEBUG,
             ..Default::default()
         })
-        .insert_resource(EguiSettings { scale_factor: 2.0 })
+        .insert_resource(EguiSettings { scale_factor: 1.2 })
         .add_plugins(DefaultPlugins)
         .add_plugin(EguiPlugin)
         .add_plugin(PersistencePlugin)
+        .add_plugin(EditorsPlugin)
         .add_startup_system(on_startup.system())
         .add_system(debug.system())
-        .add_system(AddSlidePrompt::render.system())
-        .add_system(SlideEditor::render.system())
-        .add_system(slide_list.system())
         .run();
 }
 
-fn on_startup(mut _commands: Commands) {
+fn on_startup(mut _commands: Commands, mut persistence: EventWriter<PersistenceEvent>) {
     info!("Started!");
+    persistence.send(PersistenceEvent::FileIn);
 }
 
 fn debug(
@@ -48,4 +49,3 @@ fn debug(
         }
     });
 }
-

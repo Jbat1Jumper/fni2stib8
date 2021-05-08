@@ -1,6 +1,7 @@
 use crate::model::*;
 use bevy::prelude::*;
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum PersistenceEvent {
     FileOut,
     FileIn,

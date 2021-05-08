@@ -1,1 +1,1 @@
-[{"name":"House","description":"","actions":[]},{"name":"Living room","description":"With a cat!","actions":[]},{"name":"Kitchen","description":"There is a stove here.","actions":[]}]
+[{"name":"Living","description":"","actions":[]},{"name":"Kitchen","description":"","actions":[{"text":"Walk through door","target_slide":"Living"},{"text":"Watch stove","target_slide":"Eter"}]},{"name":"Eter","description":"No veia nada, todo estaba vacío...","actions":[{"text":"","target_slide":""}]}]
