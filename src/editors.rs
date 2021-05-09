@@ -11,10 +11,10 @@ pub struct EditorsPlugin;
 impl Plugin for EditorsPlugin {
     fn build(&self, builder: &mut AppBuilder) {
         builder
-            .add_system(AddSlidePrompt::render.system())
+            .add_system(slide_list.system())
             .add_system(SlideEditor::render.system())
-            .add_system(PersistConfirmationDialog::render.system())
-            .add_system(slide_list.system());
+            .add_system(AddSlidePrompt::render.system())
+            .add_system(PersistConfirmationDialog::render.system());
     }
 }
 
@@ -52,8 +52,9 @@ impl PersistConfirmationDialog {
 
 fn slide_list(
     egui_context: ResMut<EguiContext>,
-    slides: Query<(Entity, &Slide)>,
+    slides: Query<&Slide>,
     mut commands: Commands,
+    mut slide_events: EventWriter<SlideEvent>,
 ) {
     egui::Window::new("Slides").show(egui_context.ctx(), |ui| {
         ui.horizontal(|ui| {
@@ -70,14 +71,14 @@ fn slide_list(
 
         ui.separator();
 
-        for (e, v) in slides.iter() {
+        for s in slides.iter() {
             ui.horizontal(|ui| {
-                ui.label(format!("{}", v.name,));
+                ui.label(format!("{}", s.name,));
                 if ui.small_button("edit").clicked() {
-                    commands.spawn().insert(SlideEditor::new_for(e, v));
+                    commands.spawn().insert(SlideEditor::new_for(s));
                 }
                 if ui.small_button("remove").clicked() {
-                    commands.entity(e).despawn();
+                    slide_events.send(SlideEvent::Deleted(s.name.clone()));
                 }
             });
         }
@@ -85,57 +86,58 @@ fn slide_list(
 }
 
 struct SlideEditor {
-    target: Entity,
-    unsaved: Slide,
-    info: String,
+    target: String,
+    ttl: usize,
 }
 
 impl SlideEditor {
-    fn new_for(target: Entity, slide: &Slide) -> Self {
+    fn new_for(slide: &Slide) -> Self {
         Self {
-            target,
-            unsaved: slide.clone(),
-            info: String::new(),
+            target: slide.name.clone(),
+            ttl: 3,
         }
     }
     fn render(
         egui_context: ResMut<EguiContext>,
         mut editors: Query<(Entity, &mut Self)>,
-        slides: Query<(Entity, &Slide)>,
+        slides: Query<&Slide>,
+        mut slide_events: EventWriter<SlideEvent>,
         mut commands: Commands,
     ) {
-        let valid_slide_names: Vec<_> = slides.iter().map(|(_, s)| s.name.clone()).collect();
+        let valid_slide_names: Vec<_> = slides.iter().map(|s| s.name.clone()).collect();
 
         for (eid, mut e) in editors.iter_mut() {
-            let saved = match slides.get(e.target) {
-                Err(_) => {
-                    commands.entity(eid).despawn();
+            let saved = match slides.iter().filter(|s| s.name == e.target).next() {
+                None => {
+                    if e.ttl > 0 {
+                        warn!("{} not found, closing editor in {}", e.target, e.ttl);
+                        e.ttl -= 1;
+                    } else {
+                        warn!("{} not found, editor closed", e.target);
+                        commands.entity(eid).despawn();
+                    }
                     continue;
                 }
-                Ok((_, sc)) => sc,
+                Some(s) => s,
             };
-            let title = {
-                if e.unsaved == *saved {
-                    format!("{}", saved.name)
-                } else {
-                    format!("{} (unsaved)", saved.name)
-                }
-            };
+            let mut unsaved = saved.clone();
             let mut open = true;
-            egui::Window::new(title)
+            egui::Window::new(format!("Edit: {}", saved.name))
                 .id(egui::Id::new(eid))
                 .open(&mut open)
                 .show(egui_context.ctx(), |ui| {
                     ui.horizontal(|ui| {
                         ui.label("Name:");
-                        ui.text_edit_singleline(&mut e.unsaved.name);
+                        ui.label(&unsaved.name);
+                        // Move to a rename prompt
+                        // ui.text_edit_singleline(&mut unsaved.name);
                     });
                     ui.label("Description:");
-                    ui.text_edit_multiline(&mut e.unsaved.description);
+                    ui.text_edit_multiline(&mut unsaved.description);
                     ui.label("Actions:");
                     ScrollArea::auto_sized().show(ui, |ui| {
                         let mut to_remove = vec![];
-                        for (i, a) in e.unsaved.actions.iter_mut().enumerate() {
+                        for (i, a) in unsaved.actions.iter_mut().enumerate() {
                             ui.horizontal(|ui| {
                                 ui.text_edit_singleline(&mut a.text);
                                 egui::ComboBox::from_id_source((eid, i))
@@ -160,13 +162,11 @@ impl SlideEditor {
                                         .map(|n| format!("slide{}", n))
                                         .filter(|name| !valid_slide_names.contains(name))
                                         .next()
-                                        .expect("Abusrd amount of badly named scenes");
-                                    let new_e =
-                                        commands.spawn().insert(Slide::new(name.clone())).id();
-                                    commands.spawn().insert(SlideEditor::new_for(
-                                        new_e,
-                                        &Slide::new(name.clone()),
-                                    ));
+                                        .expect("Abusrd amount of badly named slides");
+                                    commands.spawn().insert(Slide::new(name.clone()));
+                                    commands
+                                        .spawn()
+                                        .insert(SlideEditor::new_for(&Slide::new(name.clone())));
                                     a.target_slide = name;
                                 }
 
@@ -175,29 +175,17 @@ impl SlideEditor {
                                 }
                             });
                         }
-                        e.unsaved.actions.retain(|a| !to_remove.contains(a));
+                        unsaved.actions.retain(|a| !to_remove.contains(a));
                         if ui.small_button("Add action").clicked() {
-                            e.unsaved.actions.push(Action::default());
+                            unsaved.actions.push(Action::default());
                         }
                     });
-                    ui.separator();
-                    if ui.button("Save").clicked() {
-                        match validate_name(&e.unsaved.name, Some(e.target), &slides) {
-                            Err(err) => {
-                                e.info = err.into();
-                                return;
-                            }
-                            _ => {}
-                        }
-                        commands.entity(e.target).insert(e.unsaved.clone());
-                        e.info = "Saved sucessfully".into();
-                    }
-
-                    ui.separator();
-                    ui.label(&e.info);
                 });
             if !open {
                 commands.entity(eid).despawn();
+            }
+            if unsaved != *saved {
+                slide_events.send(SlideEvent::Updated(unsaved.clone()));
             }
         }
     }
@@ -214,6 +202,7 @@ impl AddSlidePrompt {
         egui_context: ResMut<EguiContext>,
         prompt: Option<ResMut<Self>>,
         mut commands: Commands,
+        mut slide_events: EventWriter<SlideEvent>,
         slides: Query<(Entity, &Slide)>,
     ) {
         if let Some(mut prompt) = prompt {
@@ -236,8 +225,9 @@ impl AddSlidePrompt {
                         }
 
                         let slide = Slide::new(prompt.name.clone());
-                        let t = commands.spawn().insert(slide.clone()).id();
-                        commands.spawn().insert(SlideEditor::new_for(t, &slide));
+
+                        slide_events.send(SlideEvent::Created(slide.clone()));
+                        commands.spawn().insert(SlideEditor::new_for(&slide));
                         commands.remove_resource::<AddSlidePrompt>();
                     }
                 });

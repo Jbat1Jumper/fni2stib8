@@ -21,9 +21,10 @@ pub fn main() {
             level: Level::DEBUG,
             ..Default::default()
         })
-        .insert_resource(EguiSettings { scale_factor: 2.0 })
+        .insert_resource(EguiSettings { scale_factor: 1.2 })
         .add_plugins(DefaultPlugins)
         .add_plugin(EguiPlugin)
+        .add_plugin(model::ModelPlugin)
         .add_plugin(persistence::PersistencePlugin)
         .add_plugin(editors::EditorsPlugin)
         .add_plugin(player::PlayerPlugin)
