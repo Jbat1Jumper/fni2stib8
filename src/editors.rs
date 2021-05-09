@@ -182,19 +182,13 @@ impl SlideEditor {
                     });
                     ui.separator();
                     if ui.button("Save").clicked() {
-                        if e.unsaved.name.is_empty() {
-                            e.info = "Name can not be empty".into();
-                            return;
+                        match validate_name(&e.unsaved.name, Some(e.target), &slides) {
+                            Err(err) => {
+                                e.info = err.into();
+                                return;
+                            }
+                            _ => {}
                         }
-
-                        if slides
-                            .iter()
-                            .any(|(en, v)| v.name == e.unsaved.name && en != e.target)
-                        {
-                            e.info = "Name already taken".into();
-                            return;
-                        }
-
                         commands.entity(e.target).insert(e.unsaved.clone());
                         e.info = "Saved sucessfully".into();
                     }
@@ -220,7 +214,7 @@ impl AddSlidePrompt {
         egui_context: ResMut<EguiContext>,
         prompt: Option<ResMut<Self>>,
         mut commands: Commands,
-        slides: Query<&Slide>,
+        slides: Query<(Entity, &Slide)>,
     ) {
         if let Some(mut prompt) = prompt {
             egui::Window::new("Create new Slide").show(egui_context.ctx(), |ui| {
@@ -233,14 +227,12 @@ impl AddSlidePrompt {
                         commands.remove_resource::<AddSlidePrompt>();
                     }
                     if ui.button("Create").clicked() {
-                        if prompt.name.is_empty() {
-                            prompt.info = "Name can not be empty".into();
-                            return;
-                        }
-
-                        if slides.iter().any(|v| v.name == prompt.name) {
-                            prompt.info = "Name already taken".into();
-                            return;
+                        match validate_name(&prompt.name, None, &slides) {
+                            Err(e) => {
+                                prompt.info = e.into();
+                                return;
+                            }
+                            _ => {}
                         }
 
                         let slide = Slide::new(prompt.name.clone());
@@ -254,4 +246,28 @@ impl AddSlidePrompt {
             });
         }
     }
+}
+
+fn validate_name(
+    name: &str,
+    entity_claiming_name: Option<Entity>,
+    query: &Query<(Entity, &Slide)>,
+) -> Result<(), &'static str> {
+    if name.is_empty() {
+        return Err("Name can not be empty");
+    }
+
+    match get_slide_entity_by_name(name, query) {
+        None => Ok(()),
+        Some(e) if Some(e) == entity_claiming_name => Ok(()),
+        Some(_other_e) => Err("There is another slide with that name"),
+    }
+}
+
+fn get_slide_entity_by_name(name: &str, query: &Query<(Entity, &Slide)>) -> Option<Entity> {
+    query
+        .iter()
+        .filter(|(_, s)| s.name == name)
+        .map(|(e, _)| e)
+        .next()
 }
