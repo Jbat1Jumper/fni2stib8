@@ -141,10 +141,35 @@ impl SlideEditor {
                                 egui::ComboBox::from_id_source((eid, i))
                                     .selected_text(&a.target_slide)
                                     .show_ui(ui, |ui| {
+                                        ui.selectable_value(
+                                            &mut a.target_slide,
+                                            "*NEW*".into(),
+                                            "*NEW*",
+                                        );
                                         for sn in valid_slide_names.iter() {
-                                            ui.selectable_value(&mut a.target_slide, sn.clone(), sn);
+                                            ui.selectable_value(
+                                                &mut a.target_slide,
+                                                sn.clone(),
+                                                sn,
+                                            );
                                         }
                                     });
+
+                                if a.target_slide == "*NEW*" {
+                                    let name = (0..10000)
+                                        .map(|n| format!("slide{}", n))
+                                        .filter(|name| !valid_slide_names.contains(name))
+                                        .next()
+                                        .expect("Abusrd amount of badly named scenes");
+                                    let new_e =
+                                        commands.spawn().insert(Slide::new(name.clone())).id();
+                                    commands.spawn().insert(SlideEditor::new_for(
+                                        new_e,
+                                        &Slide::new(name.clone()),
+                                    ));
+                                    a.target_slide = name;
+                                }
+
                                 if ui.small_button("x").clicked() {
                                     to_remove.push(a.clone());
                                 }
