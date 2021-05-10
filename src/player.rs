@@ -12,6 +12,7 @@ impl Plugin for PlayerPlugin {
     fn build(&self, builder: &mut AppBuilder) {
         builder
             .add_system(Player::render.system())
+            .add_system(Player::handle_renames.system())
             .add_system(StartPrompt::render.system());
     }
 }
@@ -59,6 +60,23 @@ struct Player {
 }
 
 impl Player {
+    fn handle_renames(
+        mut players: Query<&mut Self>,
+        mut slide_events: EventReader<SlideEvent>,
+    ) {
+        for ev in slide_events.iter() {
+            match ev {
+                SlideEvent::Renamed(old_name, new_name) => {
+                    for mut e in players.iter_mut() {
+                        if e.current_slide == *old_name {
+                            e.current_slide = new_name.clone();
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
     fn render(
         mut players: Query<(Entity, &mut Player)>,
         slides: Query<(Entity, &Slide)>,

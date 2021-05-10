@@ -13,8 +13,51 @@ impl Plugin for EditorsPlugin {
         builder
             .add_system(slide_list.system())
             .add_system(SlideEditor::render.system())
+            .add_system(SlideEditor::handle_renames.system())
             .add_system(AddSlidePrompt::render.system())
+            .add_system(RenameSlideDialog::render.system())
             .add_system(PersistConfirmationDialog::render.system());
+    }
+}
+
+struct RenameSlideDialog(String, String);
+
+impl RenameSlideDialog {
+    fn render(
+        egui_context: ResMut<EguiContext>,
+        dialog: Option<ResMut<Self>>,
+        mut slide_events: EventWriter<SlideEvent>,
+        mut commands: Commands,
+        slides: Query<&Slide>,
+    ) {
+        if dialog.is_none() {
+            return;
+        }
+        let mut dialog = dialog.unwrap();
+
+        egui::Window::new("Rename slide").show(egui_context.ctx(), |ui| {
+            ui.horizontal(|ui| {
+                ui.label(format!("\"{}\" will now be called", dialog.0));
+                ui.text_edit_singleline(&mut dialog.1);
+            });
+
+            ui.horizontal(|ui| {
+                if ui.button("Cancel").clicked() {
+                    commands.remove_resource::<Self>();
+                }
+
+                if dialog.1.is_empty() {
+                    ui.colored_label(egui::Color32::RED, "Name cant be empty");
+                } else if dialog.0 != dialog.1 && slides.iter().any(|s| s.name == dialog.1) {
+                    ui.colored_label(egui::Color32::RED, "Name already taken");
+                } else {
+                    if ui.button("Confirm rename").clicked() {
+                        slide_events.send(SlideEvent::Renamed(dialog.0.clone(), dialog.1.clone()));
+                        commands.remove_resource::<Self>();
+                    }
+                }
+            });
+        });
     }
 }
 
@@ -75,10 +118,13 @@ fn slide_list(
             ui.horizontal(|ui| {
                 ui.label(format!("{}", s.name,));
                 if ui.small_button("edit").clicked() {
-                    commands.spawn().insert(SlideEditor::new_for(s));
+                    commands.spawn().insert(SlideEditor::new_for(&s.name));
                 }
                 if ui.small_button("remove").clicked() {
                     slide_events.send(SlideEvent::Deleted(s.name.clone()));
+                }
+                if ui.small_button("rename").clicked() {
+                    commands.insert_resource(RenameSlideDialog(s.name.clone(), s.name.clone()));
                 }
             });
         }
@@ -91,10 +137,27 @@ struct SlideEditor {
 }
 
 impl SlideEditor {
-    fn new_for(slide: &Slide) -> Self {
+    fn new_for(slide_name: &str) -> Self {
         Self {
-            target: slide.name.clone(),
+            target: slide_name.into(),
             ttl: 3,
+        }
+    }
+    fn handle_renames(
+        mut editors: Query<&mut Self>,
+        mut slide_events: EventReader<SlideEvent>,
+    ) {
+        for ev in slide_events.iter() {
+            match ev {
+                SlideEvent::Renamed(old_name, new_name) => {
+                    for mut e in editors.iter_mut() {
+                        if e.target == *old_name {
+                            e.target = new_name.clone();
+                        }
+                    }
+                }
+                _ => {}
+            }
         }
     }
     fn render(
@@ -129,8 +192,12 @@ impl SlideEditor {
                     ui.horizontal(|ui| {
                         ui.label("Name:");
                         ui.label(&unsaved.name);
-                        // Move to a rename prompt
-                        // ui.text_edit_singleline(&mut unsaved.name);
+                        if ui.small_button("Rename").clicked() {
+                            commands.insert_resource(RenameSlideDialog(
+                                unsaved.name.clone(),
+                                unsaved.name.clone(),
+                            ));
+                        }
                     });
                     ui.label("Description:");
                     ui.text_edit_multiline(&mut unsaved.description);
@@ -166,10 +233,15 @@ impl SlideEditor {
                                     commands.spawn().insert(Slide::new(name.clone()));
                                     commands
                                         .spawn()
-                                        .insert(SlideEditor::new_for(&Slide::new(name.clone())));
+                                        .insert(SlideEditor::new_for(&name));
                                     a.target_slide = name;
                                 }
 
+                                if ui.small_button("->").clicked() {
+                                    commands
+                                        .spawn()
+                                        .insert(SlideEditor::new_for(&a.target_slide));
+                                }
                                 if ui.small_button("x").clicked() {
                                     to_remove.push(a.clone());
                                 }
@@ -227,7 +299,7 @@ impl AddSlidePrompt {
                         let slide = Slide::new(prompt.name.clone());
 
                         slide_events.send(SlideEvent::Created(slide.clone()));
-                        commands.spawn().insert(SlideEditor::new_for(&slide));
+                        commands.spawn().insert(SlideEditor::new_for(&slide.name));
                         commands.remove_resource::<AddSlidePrompt>();
                     }
                 });

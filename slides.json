@@ -50,6 +50,10 @@
       {
         "text": "Go back to the living room.",
         "target_slide": "LivingBottle"
+      },
+      {
+        "text": "Ask guy what happens to him.",
+        "target_slide": "AskingSaloonGuy"
       }
     ]
   },
@@ -60,6 +64,30 @@
       {
         "text": "Forget about the stains",
         "target_slide": "Living"
+      }
+    ]
+  },
+  {
+    "name": "AskingSaloonGuy",
+    "description": "You ask the weird guy what is happening to him. He answers that he suffered a strange kind of face paralysis during his years in the military. And now the only thing that sooths the pain is having a bottle of something strong nearby.",
+    "actions": [
+      {
+        "text": "I did not want to know that much",
+        "target_slide": "SaloonBottleTruth"
+      }
+    ]
+  },
+  {
+    "name": "SaloonBottleTruth",
+    "description": "You stand still in the saloon thinking about how unfair life can be sometimes. You have your bottle in your hand.",
+    "actions": [
+      {
+        "text": "Ask again what happends to the bartender ",
+        "target_slide": "AskingSaloonGuy"
+      },
+      {
+        "text": "Go back to the living room",
+        "target_slide": "LivingBottle"
       }
     ]
   }
