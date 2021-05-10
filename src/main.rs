@@ -12,6 +12,7 @@ mod editors;
 mod model;
 mod persistence;
 mod player;
+mod images;
 
 use crate::persistence::PersistenceEvent;
 
@@ -25,6 +26,7 @@ pub fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(EguiPlugin)
         .add_plugin(model::ModelPlugin)
+        .add_plugin(images::ImagesPlugin)
         .add_plugin(persistence::PersistencePlugin)
         .add_plugin(editors::EditorsPlugin)
         .add_plugin(player::PlayerPlugin)
