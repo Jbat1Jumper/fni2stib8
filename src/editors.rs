@@ -16,7 +16,51 @@ impl Plugin for EditorsPlugin {
             .add_system(SlideEditor::handle_renames.system())
             .add_system(AddSlidePrompt::render.system())
             .add_system(RenameSlideDialog::render.system())
+            .add_system(DeleteSlideDialog::render.system())
             .add_system(PersistConfirmationDialog::render.system());
+    }
+}
+struct DeleteSlideDialog(String);
+impl DeleteSlideDialog {
+    fn render(
+        egui_context: ResMut<EguiContext>,
+        dialog: Option<ResMut<Self>>,
+        mut slide_events: EventWriter<SlideEvent>,
+        mut commands: Commands,
+        slides: Query<&Slide>,
+    ) {
+        if dialog.is_none() {
+            return;
+        }
+        let mut dialog = dialog.unwrap();
+
+        let slides_with_references: Vec<_> = slides
+            .iter()
+            .filter(|s| s.actions.iter().any(|a| a.target_slide == dialog.0))
+            .map(|s| s.name.clone())
+            .collect();
+
+        egui::Window::new("Delete slide").show(egui_context.ctx(), |ui| {
+            ui.horizontal(|ui| {
+                ui.label(format!("Goging to delete \"{}\"", dialog.0));
+            });
+            ui.horizontal(|ui| {
+                if ui.button("Cancel").clicked() {
+                    commands.remove_resource::<Self>();
+                }
+                if slides_with_references.is_empty() {
+                    if ui.button("Dlete").clicked() {
+                        slide_events.send(SlideEvent::Deleted(dialog.0.clone()));
+                        commands.remove_resource::<Self>();
+                    }
+                } else {
+                    ui.colored_label(egui::Color32::RED, "Cant delete, has references from:");
+                    for r in slides_with_references {
+                        ui.label(r);
+                    }
+                }
+            });
+        });
     }
 }
 
@@ -121,7 +165,7 @@ fn slide_list(
                     commands.spawn().insert(SlideEditor::new_for(&s.name));
                 }
                 if ui.small_button("remove").clicked() {
-                    slide_events.send(SlideEvent::Deleted(s.name.clone()));
+                    commands.insert_resource(DeleteSlideDialog(s.name.clone()));
                 }
                 if ui.small_button("rename").clicked() {
                     commands.insert_resource(RenameSlideDialog(s.name.clone(), s.name.clone()));
@@ -143,10 +187,7 @@ impl SlideEditor {
             ttl: 3,
         }
     }
-    fn handle_renames(
-        mut editors: Query<&mut Self>,
-        mut slide_events: EventReader<SlideEvent>,
-    ) {
+    fn handle_renames(mut editors: Query<&mut Self>, mut slide_events: EventReader<SlideEvent>) {
         for ev in slide_events.iter() {
             match ev {
                 SlideEvent::Renamed(old_name, new_name) => {
@@ -231,9 +272,7 @@ impl SlideEditor {
                                         .next()
                                         .expect("Abusrd amount of badly named slides");
                                     commands.spawn().insert(Slide::new(name.clone()));
-                                    commands
-                                        .spawn()
-                                        .insert(SlideEditor::new_for(&name));
+                                    commands.spawn().insert(SlideEditor::new_for(&name));
                                     a.target_slide = name;
                                 }
 
@@ -250,6 +289,22 @@ impl SlideEditor {
                         unsaved.actions.retain(|a| !to_remove.contains(a));
                         if ui.small_button("Add action").clicked() {
                             unsaved.actions.push(Action::default());
+                        }
+                    });
+
+                    let slides_with_references: Vec<_> = slides
+                        .iter()
+                        .filter(|s| s.actions.iter().any(|a| a.target_slide == e.target))
+                        .map(|s| s.name.clone())
+                        .collect();
+
+                    ui.separator();
+                    ui.label("Slides referencing this one:");
+                    ui.horizontal(|ui| {
+                        for rs in slides_with_references {
+                            if ui.small_button(&rs).clicked() {
+                                commands.spawn().insert(SlideEditor::new_for(&rs));
+                            }
                         }
                     });
                 });
