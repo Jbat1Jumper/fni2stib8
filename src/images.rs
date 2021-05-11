@@ -1,3 +1,4 @@
+use serde::*;
 use std::{
     io::Read,
     thread::{spawn, JoinHandle},
@@ -11,7 +12,7 @@ use bevy_egui::{egui, EguiContext};
 use image::{GenericImageView, RgbaImage};
 
 const WIDTH: u32 = 128;
-const HEIGHT: u32 = 128 / 2;
+const HEIGHT: u32 = WIDTH / 4;
 
 fn load_from_bytes(bytes: &[u8]) -> (RgbaImage, Texture) {
     let reader = image::io::Reader::new(std::io::Cursor::new(bytes))
@@ -20,7 +21,8 @@ fn load_from_bytes(bytes: &[u8]) -> (RgbaImage, Texture) {
     let image = reader
         .decode()
         .expect("Failed to decode image")
-        .resize_to_fill(WIDTH, HEIGHT, image::imageops::FilterType::Nearest)
+        .resize_to_fill(WIDTH, HEIGHT*2, image::imageops::FilterType::Nearest)
+        .resize_exact(WIDTH, HEIGHT, image::imageops::FilterType::Nearest)
         .to_rgba8();
     let data: Vec<u8> = image.pixels().map(|p| &p.0).flatten().cloned().collect();
     let size = image.dimensions();
@@ -73,7 +75,10 @@ impl Plugin for ImagesPlugin {
                 url: "".into(),
                 next_egui_id: 0,
             })
+            .add_event::<BackgroundEvent>()
             .add_system(receive_images.system())
+            .add_system(event_handler.system())
+            .add_system(BackgroundEditor::render.system())
             .add_system(images.system());
     }
 }
@@ -113,9 +118,11 @@ fn receive_images(
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 struct Background {
     name: String,
     url: String,
+    color_channels: (usize, usize, usize),
 }
 struct BackgroundData {
     image: RgbaImage,
@@ -139,6 +146,7 @@ fn images(
                 .insert(Background {
                     name: images.url.clone(),
                     url: images.url.clone(),
+                    color_channels: (255, 255, 255),
                 })
                 .id();
         }
@@ -154,7 +162,159 @@ fn images(
             //     t.data.len()
             // ));
 
-            ui.image(bgd.ui_texture, [WIDTH as f32, HEIGHT as f32]);
+            ui.horizontal(|ui| {
+                ui.image(bgd.ui_texture, [WIDTH as f32, HEIGHT as f32]);
+                if ui.small_button("edit").clicked() {
+                    commands.spawn().insert(BackgroundEditor::new_for(&bg.name));
+                }
+            });
         }
     });
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+enum BackgroundEvent {
+    Updated(Background),
+}
+
+struct BackgroundEditor {
+    target: String,
+}
+
+fn event_handler(
+    mut events: EventReader<BackgroundEvent>,
+    mut query: Query<(Entity, &mut Background)>,
+    mut commands: Commands,
+) {
+    for e in events.iter() {
+        info!("{:?}", e);
+        match e {
+            //BackgroundEvent::Created(slide) => {
+            //    commands.spawn().insert(slide.clone());
+            //}
+            BackgroundEvent::Updated(background) => {
+                for (_, mut bg) in query.iter_mut() {
+                    if bg.name == background.name {
+                        *bg = background.clone();
+                    }
+                }
+            } //BackgroundEvent::Renamed(old_name, new_name) => {
+              //    for (_, mut s) in query.iter_mut() {
+              //        if s.name == *old_name {
+              //            s.name = new_name.clone();
+              //        }
+              //        for mut a in s.actions.iter_mut() {
+              //            if a.target_slide == *old_name {
+              //                a.target_slide = new_name.clone();
+              //            }
+              //        }
+              //    }
+              //}
+              //BackgroundEvent::Deleted(name) => {
+              //    for (eid, s) in query.iter_mut() {
+              //        if s.name == *name {
+              //            commands.entity(eid).despawn();
+              //        }
+              //    }
+              //}
+        }
+    }
+}
+
+impl BackgroundEditor {
+    fn new_for(target: &str) -> Self {
+        Self {
+            target: target.into(),
+        }
+    }
+    fn render(
+        egui_context: ResMut<EguiContext>,
+        mut editors: Query<(Entity, &mut Self)>,
+        backgrounds: Query<(&Background, &BackgroundData)>,
+        mut bg_events: EventWriter<BackgroundEvent>,
+        mut commands: Commands,
+    ) {
+        for (editor_id, mut editor) in editors.iter_mut() {
+            let (saved, bdata) = match backgrounds
+                .iter()
+                .filter(|(b, _)| b.name == editor.target)
+                .next()
+            {
+                None => {
+                    commands.entity(editor_id).despawn();
+                    continue;
+                }
+                Some(s) => s,
+            };
+            let mut unsaved = saved.clone();
+            let mut open = true;
+            egui::Window::new(format!("Edit: {}", saved.name))
+                .id(egui::Id::new(editor_id))
+                .open(&mut open)
+                .show(egui_context.ctx(), |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Name:");
+                        ui.label(&unsaved.name);
+                    });
+                    ui.horizontal(|ui| {
+                        ui.label("URL:");
+                        ui.label(&unsaved.url);
+                    });
+                    ui.separator();
+                    let mut ascii = convert_background_to_ascii(saved, bdata);
+                    ui.add(
+                        egui::TextEdit::multiline(&mut ascii)
+                            .text_style(egui::TextStyle::Monospace)
+                            .enabled(true),
+                    );
+                });
+            if !open {
+                commands.entity(editor_id).despawn();
+            }
+            if unsaved != *saved {
+                bg_events.send(BackgroundEvent::Updated(unsaved.clone()));
+            }
+        }
+    }
+}
+
+fn convert_background_to_ascii(bg: &Background, bgd: &BackgroundData) -> String {
+    bgd.image
+        .pixels()
+        .map(|p| pixel_to_intensity(bg, p))
+        .map(|i| intensity_to_ascii(i))
+        .collect::<Vec<_>>()
+        .chunks(WIDTH as usize)
+        .map(|c| c.into_iter().cloned().collect::<String>() + "\n")
+        .collect()
+}
+
+fn pixel_to_intensity(bg: &Background, p: &image::Rgba<u8>) -> u8 {
+    let p = p.0;
+    let cc = bg.color_channels;
+    let (r, g, b) = (p[0] as usize, p[1] as usize, p[2] as usize);
+    (if cc.0 == cc.1 && cc.1 == cc.2 {
+        (r + g + b) / 3
+    } else {
+        (r * cc.0 + g * cc.1 + b * cc.2) / (cc.0 + cc.1 + cc.2)
+    }) as u8
+}
+
+// Copied from edelsonc/asciify
+fn intensity_to_ascii(value: u8) -> &'static str {
+    let ascii_chars = [
+        " ", ".", "^", ",", ":", "_", "=", "~", "+", "O", "o", "*", "#", "&", "%", "B", "@", "$",
+    ];
+
+    let n_chars = ascii_chars.len() as u8;
+    let step = 255u8 / n_chars;
+    for i in 1..(n_chars - 1) {
+        let comp = &step * i;
+        if value < comp {
+            let idx = (i - 1) as usize;
+            return ascii_chars[idx];
+        }
+    }
+
+    ascii_chars[(n_chars - 1) as usize]
 }
