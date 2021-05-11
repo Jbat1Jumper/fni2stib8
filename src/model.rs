@@ -1,6 +1,10 @@
+use std::path::Path;
+
 use bevy::prelude::*;
 use serde::*;
 use serde_json;
+
+use crate::persistence::Persistable;
 
 pub struct ModelPlugin;
 
@@ -17,6 +21,12 @@ pub struct Slide {
     pub name: String,
     pub description: String,
     pub actions: Vec<Action>,
+}
+
+impl Persistable for Slide {
+    fn file_path() -> &'static Path {
+        Path::new("slides.json")
+    }
 }
 
 impl Slide {

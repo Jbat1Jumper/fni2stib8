@@ -1,4 +1,3 @@
-use crate::model::*;
 use bevy::prelude::*;
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -27,12 +26,9 @@ where
 use std::fs::File;
 use std::path::Path;
 
-fn file_path() -> &'static Path {
-    Path::new("slides.json")
+pub trait Persistable: Clone + Send + Sync + Serialize + DeserializeOwned {
+    fn file_path() -> &'static Path;
 }
-
-pub trait Persistable: Clone + Send + Sync + Serialize + DeserializeOwned {}
-impl<T> Persistable for T where T: Clone + Send + Sync + Serialize + DeserializeOwned {}
 
 impl<R> PersistencePlugin<R>
 where
@@ -56,9 +52,9 @@ where
                         commands.entity(se).despawn();
                     }
 
-                    if file_path().exists() {
+                    if R::file_path().exists() {
                         info!("File exists, loading!");
-                        let f = File::open(file_path()).expect("Failed to read resources file");
+                        let f = File::open(R::file_path()).expect("Failed to read resources file");
                         let resources: Vec<R> =
                             serde_json::from_reader(f).expect("Failed to parse resources file");
                         for res in resources.iter() {
@@ -72,7 +68,7 @@ where
                 PersistenceEvent::FileOut => {
                     info!("Writing to file!");
                     let resources: Vec<R> = resources.iter().map(|(_, res)| res).cloned().collect();
-                    let f = File::create(file_path()).expect("Failed to write to resources file");
+                    let f = File::create(R::file_path()).expect("Failed to write to resources file");
                     serde_json::to_writer_pretty(f, &resources)
                         .expect("Failed to rialize to resources files");
                     info!("Wrote {} resources", resources.len());

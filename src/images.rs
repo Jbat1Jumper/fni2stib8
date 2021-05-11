@@ -1,6 +1,7 @@
 use serde::*;
 use std::{
     io::Read,
+    path::Path,
     thread::{spawn, JoinHandle},
 };
 
@@ -21,7 +22,7 @@ fn load_from_bytes(bytes: &[u8]) -> (RgbaImage, Texture) {
     let image = reader
         .decode()
         .expect("Failed to decode image")
-        .resize_to_fill(WIDTH, HEIGHT*2, image::imageops::FilterType::Nearest)
+        .resize_to_fill(WIDTH, HEIGHT * 2, image::imageops::FilterType::Nearest)
         .resize_exact(WIDTH, HEIGHT, image::imageops::FilterType::Nearest)
         .to_rgba8();
     let data: Vec<u8> = image.pixels().map(|p| &p.0).flatten().cloned().collect();
@@ -53,8 +54,11 @@ fn load_from_response(response: ureq::Response) -> (RgbaImage, Texture) {
 
 use std::sync::mpsc::{channel, Receiver, Sender};
 
+use crate::persistence::{Persistable, PersistenceEvent};
+
 fn request_image(url: String, sender: Sender<(String, RgbaImage, Texture)>) -> JoinHandle<()> {
     spawn(move || {
+        info!("Requesting image from {}", url);
         let response = ureq::get(&url).call().expect("Failed to request image");
         let (i, t) = load_from_response(response);
         sender
@@ -75,8 +79,10 @@ impl Plugin for ImagesPlugin {
                 url: "".into(),
                 next_egui_id: 0,
             })
+            .add_plugin(crate::persistence::PersistencePlugin::<Background>::new())
             .add_event::<BackgroundEvent>()
             .add_system(receive_images.system())
+            .add_system(auto_request_images.system())
             .add_system(event_handler.system())
             .add_system(BackgroundEditor::render.system())
             .add_system(images.system());
@@ -119,15 +125,35 @@ fn receive_images(
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-struct Background {
+pub struct Background {
     name: String,
     url: String,
     color_channels: (usize, usize, usize),
 }
+
+impl Persistable for Background {
+    fn file_path() -> &'static Path {
+        Path::new("backgrounds.json")
+    }
+}
+
 struct BackgroundData {
     image: RgbaImage,
     texture_handle: Handle<Texture>,
     ui_texture: egui::TextureId,
+}
+
+struct Requested;
+
+fn auto_request_images(
+    backgrounds: Query<(Entity, &Background), Without<Requested>>,
+    images: NonSendMut<ImagesRes>,
+    mut commands: Commands,
+) {
+    for (e, bg) in backgrounds.iter() {
+        commands.entity(e).insert(Requested);
+        request_image(bg.url.clone(), images.sender.clone());
+    }
 }
 
 fn images(
@@ -135,12 +161,12 @@ fn images(
     mut images: NonSendMut<ImagesRes>,
     mut commands: Commands,
     backgrounds: Query<(&Background, &BackgroundData)>,
+    mut bg_persistence: EventWriter<PersistenceEvent<Background>>,
 ) {
     egui::Window::new("Download Image").show(egui_context.ctx(), |ui| {
         ui.label("URL:");
         ui.text_edit_singleline(&mut images.url);
         if ui.button("Request").clicked() {
-            request_image(images.url.clone(), images.sender.clone());
             let e = commands
                 .spawn()
                 .insert(Background {
@@ -154,6 +180,18 @@ fn images(
     });
 
     egui::Window::new("Images").show(egui_context.ctx(), |ui| {
+        ui.horizontal(|ui| {
+            if ui.button("Add New").clicked() {
+                bg_persistence.send(PersistenceEvent::FileIn);
+            }
+            if ui.button("File In").clicked() {
+                bg_persistence.send(PersistenceEvent::FileIn);
+            }
+            if ui.button("File Out").clicked() {
+                bg_persistence.send(PersistenceEvent::FileOut);
+            }
+        });
+
         for (bg, bgd) in backgrounds.iter() {
             // ui.label(format!(
             //     "size: {:?}, format: {:?}, len: {}",
@@ -161,7 +199,7 @@ fn images(
             //     t.format,
             //     t.data.len()
             // ));
-
+            //
             ui.horizontal(|ui| {
                 ui.image(bgd.ui_texture, [WIDTH as f32, HEIGHT as f32]);
                 if ui.small_button("edit").clicked() {
