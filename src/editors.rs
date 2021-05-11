@@ -64,21 +64,21 @@ impl DeleteSlideDialog {
     }
 }
 
-struct RenameDialog<R> {
+pub struct RenameDialog<R> {
     old_name: String,
     new_name: String,
     _phantom: std::marker::PhantomData<R>,
 }
 
 impl<R: 'static + Crudable> RenameDialog<R> {
-    fn new_for(res: &R) -> Self {
+    pub fn new_for(res: &R) -> Self {
         Self {
             old_name: res.name().clone(),
             new_name: res.name().clone(),
             _phantom: Default::default(),
         }
     }
-    fn render(
+    pub fn render(
         egui_context: ResMut<EguiContext>,
         dialog: Option<ResMut<Self>>,
         mut crud_events: EventWriter<CrudEvent<R>>,

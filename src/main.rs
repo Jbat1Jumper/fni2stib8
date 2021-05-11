@@ -35,9 +35,14 @@ pub fn main() {
         .run();
 }
 
-fn on_startup(mut _commands: Commands, mut persistence: EventWriter<PersistenceEvent<model::Slide>>) {
+fn on_startup(
+    mut _commands: Commands,
+    mut persistence: EventWriter<PersistenceEvent<model::Slide>>,
+    mut persistence_bg: EventWriter<PersistenceEvent<images::Background>>,
+) {
     info!("Started!");
     persistence.send(PersistenceEvent::FileIn);
+    persistence_bg.send(PersistenceEvent::FileIn);
 }
 
 fn debug(

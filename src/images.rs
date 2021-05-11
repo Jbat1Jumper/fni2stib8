@@ -54,7 +54,11 @@ fn load_from_response(response: ureq::Response) -> (RgbaImage, Texture) {
 
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-use crate::{model::CrudEvent, persistence::{Persistable, PersistenceEvent}};
+use crate::{
+    editors::RenameDialog,
+    model::CrudEvent,
+    persistence::{Persistable, PersistenceEvent},
+};
 
 fn request_image(url: String, sender: Sender<(String, RgbaImage, Texture)>) -> JoinHandle<()> {
     spawn(move || {
@@ -82,8 +86,10 @@ impl Plugin for ImagesPlugin {
             .add_plugin(crate::persistence::PersistencePlugin::<Background>::new())
             .add_plugin(crate::model::CrudPlugin::<Background>::new())
             .add_system(receive_images.system())
+            .add_system(RenameDialog::<Background>::render.system())
             .add_system(auto_request_images.system())
             .add_system(BackgroundEditor::render.system())
+            .add_system(BackgroundEditor::handle_renames.system())
             .add_system(images.system());
     }
 }
@@ -201,6 +207,7 @@ fn images(
                 bg_persistence.send(PersistenceEvent::FileOut);
             }
         });
+        ui.separator();
 
         for (bg, bgd) in backgrounds.iter() {
             // ui.label(format!(
@@ -211,9 +218,12 @@ fn images(
             // ));
             //
             ui.horizontal(|ui| {
-                ui.image(bgd.ui_texture, [WIDTH as f32, HEIGHT as f32]);
-                if ui.small_button("edit").clicked() {
+                ui.image(bgd.ui_texture, [WIDTH as f32, 2. * HEIGHT as f32]);
+                if ui.button("edit").clicked() {
                     commands.spawn().insert(BackgroundEditor::new_for(&bg.name));
+                }
+                if ui.button("rename").clicked() {
+                    commands.insert_resource(RenameDialog::new_for(bg));
                 }
             });
         }
@@ -225,24 +235,40 @@ struct BackgroundEditor {
     target: String,
 }
 
-
 impl BackgroundEditor {
     fn new_for(target: &str) -> Self {
         Self {
             target: target.into(),
         }
     }
+    fn handle_renames(
+        mut editors: Query<&mut Self>,
+        mut slide_events: EventReader<CrudEvent<Background>>,
+    ) {
+        for ev in slide_events.iter() {
+            match ev {
+                CrudEvent::Renamed(old_name, new_name) => {
+                    for mut e in editors.iter_mut() {
+                        if e.target == *old_name {
+                            e.target = new_name.clone();
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
     fn render(
         egui_context: ResMut<EguiContext>,
         mut editors: Query<(Entity, &mut Self)>,
-        backgrounds: Query<(&Background, &BackgroundData)>,
+        backgrounds: Query<(Entity, &Background, &BackgroundData)>,
         mut bg_events: EventWriter<CrudEvent<Background>>,
         mut commands: Commands,
     ) {
         for (editor_id, mut editor) in editors.iter_mut() {
-            let (saved, bdata) = match backgrounds
+            let (bg_entity, saved, bdata) = match backgrounds
                 .iter()
-                .filter(|(b, _)| b.name == editor.target)
+                .filter(|(_, b, _)| b.name == editor.target)
                 .next()
             {
                 None => {
@@ -254,23 +280,31 @@ impl BackgroundEditor {
             let mut unsaved = saved.clone();
             let mut open = true;
             egui::Window::new(format!("Edit: {}", saved.name))
+                .default_width(966.)
+                .min_width(966.)
                 .id(egui::Id::new(editor_id))
                 .open(&mut open)
                 .show(egui_context.ctx(), |ui| {
                     ui.horizontal(|ui| {
                         ui.label("Name:");
                         ui.label(&unsaved.name);
+                        if ui.small_button("rename").clicked() {
+                            commands.insert_resource(RenameDialog::new_for(&unsaved));
+                        }
                     });
                     ui.horizontal(|ui| {
                         ui.label("URL:");
-                        ui.label(&unsaved.url);
+                        ui.text_edit_multiline(&mut unsaved.url);
+                        if ui.small_button("refresh").clicked() {
+                            commands.entity(bg_entity).remove::<Requested>();
+                        }
                     });
                     ui.separator();
                     let mut ascii = convert_background_to_ascii(saved, bdata);
                     ui.add(
                         egui::TextEdit::multiline(&mut ascii)
                             .text_style(egui::TextStyle::Monospace)
-                            .enabled(true),
+                            .enabled(false),
                     );
                 });
             if !open {
