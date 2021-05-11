@@ -54,7 +54,7 @@ fn load_from_response(response: ureq::Response) -> (RgbaImage, Texture) {
 
 use std::sync::mpsc::{channel, Receiver, Sender};
 
-use crate::persistence::{Persistable, PersistenceEvent};
+use crate::{model::CrudEvent, persistence::{Persistable, PersistenceEvent}};
 
 fn request_image(url: String, sender: Sender<(String, RgbaImage, Texture)>) -> JoinHandle<()> {
     spawn(move || {
@@ -80,10 +80,9 @@ impl Plugin for ImagesPlugin {
                 next_egui_id: 0,
             })
             .add_plugin(crate::persistence::PersistencePlugin::<Background>::new())
-            .add_event::<BackgroundEvent>()
+            .add_plugin(crate::model::CrudPlugin::<Background>::new())
             .add_system(receive_images.system())
             .add_system(auto_request_images.system())
-            .add_system(event_handler.system())
             .add_system(BackgroundEditor::render.system())
             .add_system(images.system());
     }
@@ -134,6 +133,17 @@ pub struct Background {
 impl Persistable for Background {
     fn file_path() -> &'static Path {
         Path::new("backgrounds.json")
+    }
+}
+impl crate::model::Crudable for Background {
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+    fn set_name(&mut self, new_name: String) {
+        self.name = new_name;
+    }
+    fn default_name_prefix() -> &'static str {
+        "background"
     }
 }
 
@@ -211,53 +221,10 @@ fn images(
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-enum BackgroundEvent {
-    Updated(Background),
-}
-
 struct BackgroundEditor {
     target: String,
 }
 
-fn event_handler(
-    mut events: EventReader<BackgroundEvent>,
-    mut query: Query<(Entity, &mut Background)>,
-    mut commands: Commands,
-) {
-    for e in events.iter() {
-        info!("{:?}", e);
-        match e {
-            //BackgroundEvent::Created(slide) => {
-            //    commands.spawn().insert(slide.clone());
-            //}
-            BackgroundEvent::Updated(background) => {
-                for (_, mut bg) in query.iter_mut() {
-                    if bg.name == background.name {
-                        *bg = background.clone();
-                    }
-                }
-            } //BackgroundEvent::Renamed(old_name, new_name) => {
-              //    for (_, mut s) in query.iter_mut() {
-              //        if s.name == *old_name {
-              //            s.name = new_name.clone();
-              //        }
-              //        for mut a in s.actions.iter_mut() {
-              //            if a.target_slide == *old_name {
-              //                a.target_slide = new_name.clone();
-              //            }
-              //        }
-              //    }
-              //}
-              //BackgroundEvent::Deleted(name) => {
-              //    for (eid, s) in query.iter_mut() {
-              //        if s.name == *name {
-              //            commands.entity(eid).despawn();
-              //        }
-              //    }
-              //}
-        }
-    }
-}
 
 impl BackgroundEditor {
     fn new_for(target: &str) -> Self {
@@ -269,7 +236,7 @@ impl BackgroundEditor {
         egui_context: ResMut<EguiContext>,
         mut editors: Query<(Entity, &mut Self)>,
         backgrounds: Query<(&Background, &BackgroundData)>,
-        mut bg_events: EventWriter<BackgroundEvent>,
+        mut bg_events: EventWriter<CrudEvent<Background>>,
         mut commands: Commands,
     ) {
         for (editor_id, mut editor) in editors.iter_mut() {
@@ -310,7 +277,7 @@ impl BackgroundEditor {
                 commands.entity(editor_id).despawn();
             }
             if unsaved != *saved {
-                bg_events.send(BackgroundEvent::Updated(unsaved.clone()));
+                bg_events.send(CrudEvent::Updated(unsaved.clone()));
             }
         }
     }

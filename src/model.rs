@@ -45,7 +45,7 @@ pub struct Action {
     pub target_slide: String,
 }
 
-struct CrudPlugin<R> {
+pub struct CrudPlugin<R> {
     _phantom: std::marker::PhantomData<R>,
 }
 
@@ -57,7 +57,7 @@ impl<R: 'static + Crudable> Plugin for CrudPlugin<R> {
     }
 }
 
-trait Crudable: Clone + Send + Sync + std::fmt::Debug {
+pub trait Crudable: Clone + Send + Sync + std::fmt::Debug {
     fn name(&self) -> String;
     fn set_name(&mut self, new_name: String);
     fn default_name_prefix() -> &'static str;
