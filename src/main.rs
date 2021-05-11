@@ -9,10 +9,10 @@ use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext, EguiPlugin, EguiSettings};
 
 mod editors;
+mod images;
 mod model;
 mod persistence;
 mod player;
-mod images;
 
 use crate::persistence::PersistenceEvent;
 
@@ -27,7 +27,7 @@ pub fn main() {
         .add_plugin(EguiPlugin)
         .add_plugin(model::ModelPlugin)
         .add_plugin(images::ImagesPlugin)
-        .add_plugin(persistence::PersistencePlugin)
+        .add_plugin(persistence::PersistencePlugin::<model::Slide>::new())
         .add_plugin(editors::EditorsPlugin)
         .add_plugin(player::PlayerPlugin)
         .add_startup_system(on_startup.system())
@@ -35,7 +35,7 @@ pub fn main() {
         .run();
 }
 
-fn on_startup(mut _commands: Commands, mut persistence: EventWriter<PersistenceEvent>) {
+fn on_startup(mut _commands: Commands, mut persistence: EventWriter<PersistenceEvent<model::Slide>>) {
     info!("Started!");
     persistence.send(PersistenceEvent::FileIn);
 }
@@ -53,6 +53,5 @@ fn debug(
         if ui.button("Start").clicked() {
             commands.insert_resource(player::StartPrompt("".into()));
         }
-
     });
 }

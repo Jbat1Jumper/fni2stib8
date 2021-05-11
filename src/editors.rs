@@ -105,14 +105,14 @@ impl RenameSlideDialog {
     }
 }
 
-struct PersistConfirmationDialog(PersistenceEvent);
+struct PersistConfirmationDialog(PersistenceEvent<Slide>);
 
 impl PersistConfirmationDialog {
     fn render(
         egui_context: ResMut<EguiContext>,
         mut commands: Commands,
         dialog: Option<Res<Self>>,
-        mut fs_event: EventWriter<PersistenceEvent>,
+        mut fs_event: EventWriter<PersistenceEvent<Slide>>,
     ) {
         if dialog.is_none() {
             return;
@@ -123,10 +123,11 @@ impl PersistConfirmationDialog {
             ui.label(match dialog.0 {
                 PersistenceEvent::FileIn => "Doing a File In will erase all your unsaved changes.",
                 PersistenceEvent::FileOut => "Doing a File Out will override the file",
+                PersistenceEvent::_Phantom(_) => unreachable!(),
             });
             ui.horizontal(|ui| {
                 if ui.button("Proceed").clicked() {
-                    fs_event.send(dialog.0);
+                    fs_event.send(dialog.0.clone());
                     commands.remove_resource::<Self>();
                 }
                 if ui.button("Cancel").clicked() {

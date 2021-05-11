@@ -1,5 +1,4 @@
 use crate::model::*;
-use crate::persistence::PersistenceEvent;
 use bevy::prelude::*;
 use bevy_egui::{
     egui::{self, ScrollArea, TextEdit},
