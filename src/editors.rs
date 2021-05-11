@@ -15,7 +15,7 @@ impl Plugin for EditorsPlugin {
             .add_system(SlideEditor::render.system())
             .add_system(SlideEditor::handle_renames.system())
             .add_system(AddSlidePrompt::render.system())
-            .add_system(RenameSlideDialog::render.system())
+            .add_system(RenameDialog::<Slide>::render.system())
             .add_system(DeleteSlideDialog::render.system())
             .add_system(PersistConfirmationDialog::render.system());
     }
@@ -64,44 +64,63 @@ impl DeleteSlideDialog {
     }
 }
 
-struct RenameSlideDialog(String, String);
+struct RenameDialog<R> {
+    old_name: String,
+    new_name: String,
+    _phantom: std::marker::PhantomData<R>,
+}
 
-impl RenameSlideDialog {
+impl<R: 'static + Crudable> RenameDialog<R> {
+    fn new_for(res: &R) -> Self {
+        Self {
+            old_name: res.name().clone(),
+            new_name: res.name().clone(),
+            _phantom: Default::default(),
+        }
+    }
     fn render(
         egui_context: ResMut<EguiContext>,
         dialog: Option<ResMut<Self>>,
-        mut slide_events: EventWriter<CrudEvent<Slide>>,
+        mut crud_events: EventWriter<CrudEvent<R>>,
         mut commands: Commands,
-        slides: Query<&Slide>,
+        resources: Query<&R>,
     ) {
         if dialog.is_none() {
             return;
         }
         let mut dialog = dialog.unwrap();
 
-        egui::Window::new("Rename slide").show(egui_context.ctx(), |ui| {
-            ui.horizontal(|ui| {
-                ui.label(format!("\"{}\" will now be called", dialog.0));
-                ui.text_edit_singleline(&mut dialog.1);
-            });
+        egui::Window::new(format!("Rename {}", R::default_name_prefix())).show(
+            egui_context.ctx(),
+            |ui| {
+                ui.horizontal(|ui| {
+                    ui.label(format!("\"{}\" will now be called", dialog.old_name));
+                    ui.text_edit_singleline(&mut dialog.new_name);
+                });
 
-            ui.horizontal(|ui| {
-                if ui.button("Cancel").clicked() {
-                    commands.remove_resource::<Self>();
-                }
-
-                if dialog.1.is_empty() {
-                    ui.colored_label(egui::Color32::RED, "Name cant be empty");
-                } else if dialog.0 != dialog.1 && slides.iter().any(|s| s.name == dialog.1) {
-                    ui.colored_label(egui::Color32::RED, "Name already taken");
-                } else {
-                    if ui.button("Confirm rename").clicked() {
-                        slide_events.send(CrudEvent::Renamed(dialog.0.clone(), dialog.1.clone()));
+                ui.horizontal(|ui| {
+                    if ui.button("Cancel").clicked() {
                         commands.remove_resource::<Self>();
                     }
-                }
-            });
-        });
+
+                    if dialog.new_name.is_empty() {
+                        ui.colored_label(egui::Color32::RED, "Name cant be empty");
+                    } else if dialog.old_name != dialog.new_name
+                        && resources.iter().any(|r| r.name() == dialog.new_name)
+                    {
+                        ui.colored_label(egui::Color32::RED, "Name already taken");
+                    } else {
+                        if ui.button("Confirm rename").clicked() {
+                            crud_events.send(CrudEvent::Renamed(
+                                dialog.old_name.clone(),
+                                dialog.new_name.clone(),
+                            ));
+                            commands.remove_resource::<Self>();
+                        }
+                    }
+                });
+            },
+        );
     }
 }
 
@@ -169,7 +188,7 @@ fn slide_list(
                     commands.insert_resource(DeleteSlideDialog(s.name.clone()));
                 }
                 if ui.small_button("rename").clicked() {
-                    commands.insert_resource(RenameSlideDialog(s.name.clone(), s.name.clone()));
+                    commands.insert_resource(RenameDialog::new_for(s));
                 }
             });
         }
@@ -188,7 +207,10 @@ impl SlideEditor {
             ttl: 3,
         }
     }
-    fn handle_renames(mut editors: Query<&mut Self>, mut slide_events: EventReader<CrudEvent<Slide>>) {
+    fn handle_renames(
+        mut editors: Query<&mut Self>,
+        mut slide_events: EventReader<CrudEvent<Slide>>,
+    ) {
         for ev in slide_events.iter() {
             match ev {
                 CrudEvent::Renamed(old_name, new_name) => {
@@ -235,10 +257,7 @@ impl SlideEditor {
                         ui.label("Name:");
                         ui.label(&unsaved.name);
                         if ui.small_button("Rename").clicked() {
-                            commands.insert_resource(RenameSlideDialog(
-                                unsaved.name.clone(),
-                                unsaved.name.clone(),
-                            ));
+                            commands.insert_resource(RenameDialog::new_for(&unsaved));
                         }
                     });
                     ui.label("Description:");
