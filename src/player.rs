@@ -61,11 +61,11 @@ struct Player {
 impl Player {
     fn handle_renames(
         mut players: Query<&mut Self>,
-        mut slide_events: EventReader<SlideEvent>,
+        mut slide_events: EventReader<CrudEvent<Slide>>,
     ) {
         for ev in slide_events.iter() {
             match ev {
-                SlideEvent::Renamed(old_name, new_name) => {
+                CrudEvent::Renamed(old_name, new_name) => {
                     for mut e in players.iter_mut() {
                         if e.current_slide == *old_name {
                             e.current_slide = new_name.clone();

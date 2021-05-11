@@ -11,8 +11,8 @@ pub struct ModelPlugin;
 impl Plugin for ModelPlugin {
     fn build(&self, builder: &mut AppBuilder) {
         builder
-            .add_event::<SlideEvent>()
-            .add_system(event_handler.system());
+            .add_plugin(CrudPlugin::<Slide>::new())
+            .add_system(update_references.system());
     }
 }
 
@@ -45,37 +45,45 @@ pub struct Action {
     pub target_slide: String,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub enum SlideEvent {
-    Created(Slide),
-    Updated(Slide),
-    Renamed(String, String),
-    Deleted(String),
+struct CrudPlugin<R> {
+    _phantom: std::marker::PhantomData<R>,
 }
 
-fn event_handler(
-    mut events: EventReader<SlideEvent>,
+impl<R: 'static + Crudable> Plugin for CrudPlugin<R> {
+    fn build(&self, builder: &mut AppBuilder) {
+        builder
+            .add_event::<CrudEvent<R>>()
+            .add_system(Self::event_handler.system());
+    }
+}
+
+trait Crudable: Clone + Send + Sync + std::fmt::Debug {
+    fn name(&self) -> String;
+    fn set_name(&mut self, new_name: String);
+    fn default_name_prefix() -> &'static str;
+}
+
+impl Crudable for Slide {
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+    fn set_name(&mut self, new_name: String) {
+        self.name = new_name;
+    }
+    fn default_name_prefix() -> &'static str {
+        "slide"
+    }
+}
+
+fn update_references(
+    mut events: EventReader<CrudEvent<Slide>>,
     mut query: Query<(Entity, &mut Slide)>,
     mut commands: Commands,
 ) {
     for e in events.iter() {
-        info!("{:?}", e);
         match e {
-            SlideEvent::Created(slide) => {
-                commands.spawn().insert(slide.clone());
-            }
-            SlideEvent::Updated(slide) => {
+            CrudEvent::Renamed(old_name, new_name) => {
                 for (_, mut s) in query.iter_mut() {
-                    if s.name == slide.name {
-                        *s = slide.clone();
-                    }
-                }
-            }
-            SlideEvent::Renamed(old_name, new_name) => {
-                for (_, mut s) in query.iter_mut() {
-                    if s.name == *old_name {
-                        s.name = new_name.clone();
-                    }
                     for mut a in s.actions.iter_mut() {
                         if a.target_slide == *old_name {
                             a.target_slide = new_name.clone();
@@ -83,13 +91,58 @@ fn event_handler(
                     }
                 }
             }
-            SlideEvent::Deleted(name) => {
-                for (eid, s) in query.iter_mut() {
-                    if s.name == *name {
-                        commands.entity(eid).despawn();
+            _ => {}
+        }
+    }
+}
+
+impl<R: 'static + Crudable> CrudPlugin<R> {
+    pub fn new() -> Self {
+        Self {
+            _phantom: Default::default(),
+        }
+    }
+    fn event_handler(
+        mut events: EventReader<CrudEvent<R>>,
+        mut query: Query<(Entity, &mut R)>,
+        mut commands: Commands,
+    ) {
+        for e in events.iter() {
+            info!("{:?}", e);
+            match e {
+                CrudEvent::Created(res) => {
+                    commands.spawn().insert(res.clone());
+                }
+                CrudEvent::Updated(res) => {
+                    for (_, mut s) in query.iter_mut() {
+                        if s.name() == res.name() {
+                            *s = res.clone();
+                        }
+                    }
+                }
+                CrudEvent::Renamed(old_name, new_name) => {
+                    for (_, mut s) in query.iter_mut() {
+                        if s.name() == *old_name {
+                            s.set_name(new_name.clone());
+                        }
+                    }
+                }
+                CrudEvent::Deleted(name) => {
+                    for (eid, s) in query.iter_mut() {
+                        if s.name() == *name {
+                            commands.entity(eid).despawn();
+                        }
                     }
                 }
             }
         }
     }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CrudEvent<R> {
+    Created(R),
+    Updated(R),
+    Renamed(String, String),
+    Deleted(String),
 }

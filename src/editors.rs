@@ -25,7 +25,7 @@ impl DeleteSlideDialog {
     fn render(
         egui_context: ResMut<EguiContext>,
         dialog: Option<ResMut<Self>>,
-        mut slide_events: EventWriter<SlideEvent>,
+        mut slide_events: EventWriter<CrudEvent<Slide>>,
         mut commands: Commands,
         slides: Query<&Slide>,
     ) {
@@ -50,7 +50,7 @@ impl DeleteSlideDialog {
                 }
                 if slides_with_references.is_empty() {
                     if ui.button("Dlete").clicked() {
-                        slide_events.send(SlideEvent::Deleted(dialog.0.clone()));
+                        slide_events.send(CrudEvent::Deleted(dialog.0.clone()));
                         commands.remove_resource::<Self>();
                     }
                 } else {
@@ -70,7 +70,7 @@ impl RenameSlideDialog {
     fn render(
         egui_context: ResMut<EguiContext>,
         dialog: Option<ResMut<Self>>,
-        mut slide_events: EventWriter<SlideEvent>,
+        mut slide_events: EventWriter<CrudEvent<Slide>>,
         mut commands: Commands,
         slides: Query<&Slide>,
     ) {
@@ -96,7 +96,7 @@ impl RenameSlideDialog {
                     ui.colored_label(egui::Color32::RED, "Name already taken");
                 } else {
                     if ui.button("Confirm rename").clicked() {
-                        slide_events.send(SlideEvent::Renamed(dialog.0.clone(), dialog.1.clone()));
+                        slide_events.send(CrudEvent::Renamed(dialog.0.clone(), dialog.1.clone()));
                         commands.remove_resource::<Self>();
                     }
                 }
@@ -142,7 +142,7 @@ fn slide_list(
     egui_context: ResMut<EguiContext>,
     slides: Query<&Slide>,
     mut commands: Commands,
-    mut slide_events: EventWriter<SlideEvent>,
+    mut slide_events: EventWriter<CrudEvent<Slide>>,
 ) {
     egui::Window::new("Slides").show(egui_context.ctx(), |ui| {
         ui.horizontal(|ui| {
@@ -188,10 +188,10 @@ impl SlideEditor {
             ttl: 3,
         }
     }
-    fn handle_renames(mut editors: Query<&mut Self>, mut slide_events: EventReader<SlideEvent>) {
+    fn handle_renames(mut editors: Query<&mut Self>, mut slide_events: EventReader<CrudEvent<Slide>>) {
         for ev in slide_events.iter() {
             match ev {
-                SlideEvent::Renamed(old_name, new_name) => {
+                CrudEvent::Renamed(old_name, new_name) => {
                     for mut e in editors.iter_mut() {
                         if e.target == *old_name {
                             e.target = new_name.clone();
@@ -206,7 +206,7 @@ impl SlideEditor {
         egui_context: ResMut<EguiContext>,
         mut editors: Query<(Entity, &mut Self)>,
         slides: Query<&Slide>,
-        mut slide_events: EventWriter<SlideEvent>,
+        mut slide_events: EventWriter<CrudEvent<Slide>>,
         mut commands: Commands,
     ) {
         let valid_slide_names: Vec<_> = slides.iter().map(|s| s.name.clone()).collect();
@@ -313,7 +313,7 @@ impl SlideEditor {
                 commands.entity(eid).despawn();
             }
             if unsaved != *saved {
-                slide_events.send(SlideEvent::Updated(unsaved.clone()));
+                slide_events.send(CrudEvent::Updated(unsaved.clone()));
             }
         }
     }
@@ -330,7 +330,7 @@ impl AddSlidePrompt {
         egui_context: ResMut<EguiContext>,
         prompt: Option<ResMut<Self>>,
         mut commands: Commands,
-        mut slide_events: EventWriter<SlideEvent>,
+        mut slide_events: EventWriter<CrudEvent<Slide>>,
         slides: Query<(Entity, &Slide)>,
     ) {
         if let Some(mut prompt) = prompt {
@@ -354,7 +354,7 @@ impl AddSlidePrompt {
 
                         let slide = Slide::new(prompt.name.clone());
 
-                        slide_events.send(SlideEvent::Created(slide.clone()));
+                        slide_events.send(CrudEvent::Created(slide.clone()));
                         commands.spawn().insert(SlideEditor::new_for(&slide.name));
                         commands.remove_resource::<AddSlidePrompt>();
                     }

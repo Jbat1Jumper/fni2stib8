@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use serde::{de::DeserializeOwned, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PersistenceEvent<R> {
     FileOut,
     FileIn,
@@ -36,7 +36,7 @@ where
 {
     pub fn new() -> Self {
         Self {
-            phantom: std::marker::PhantomData::default(),
+            phantom: Default::default(),
         }
     }
 
