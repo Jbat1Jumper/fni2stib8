@@ -20,6 +20,8 @@ impl Plugin for ModelPlugin {
 pub struct Slide {
     pub name: String,
     pub description: String,
+    #[serde(default)]
+    pub background: String,
     pub actions: Vec<Action>,
 }
 
@@ -33,6 +35,7 @@ impl Slide {
     pub fn new(name: String) -> Self {
         Self {
             name,
+            background: "".into(),
             description: String::new(),
             actions: vec![],
         }

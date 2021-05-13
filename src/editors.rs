@@ -1,4 +1,4 @@
-use crate::model::*;
+use crate::{images::Background, model::*};
 use crate::persistence::PersistenceEvent;
 use bevy::prelude::*;
 use bevy_egui::{
@@ -228,6 +228,7 @@ impl SlideEditor {
         egui_context: ResMut<EguiContext>,
         mut editors: Query<(Entity, &mut Self)>,
         slides: Query<&Slide>,
+        backgrounds: Query<&Background>,
         mut slide_events: EventWriter<CrudEvent<Slide>>,
         mut commands: Commands,
     ) {
@@ -262,6 +263,25 @@ impl SlideEditor {
                     });
                     ui.label("Description:");
                     ui.text_edit_multiline(&mut unsaved.description);
+                    ui.horizontal(|ui| {
+                        ui.label("Background:");
+                        egui::ComboBox::from_id_source((eid, "bg"))
+                            .selected_text(&unsaved.background)
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(
+                                    &mut unsaved.background,
+                                    "".into(),
+                                    "*Empty*",
+                                );
+                                for bg in backgrounds.iter() {
+                                    ui.selectable_value(
+                                        &mut unsaved.background,
+                                        bg.name().clone(),
+                                        &bg.name(),
+                                    );
+                                }
+                            });
+                    });
                     ui.label("Actions:");
                     ScrollArea::auto_sized().show(ui, |ui| {
                         let mut to_remove = vec![];
