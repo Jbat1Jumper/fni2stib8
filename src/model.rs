@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use serde::*;
 use serde_json;
 
-use crate::persistence::Persistable;
+use crate::{images::Background, persistence::Persistable};
 
 pub struct ModelPlugin;
 
@@ -12,7 +12,8 @@ impl Plugin for ModelPlugin {
     fn build(&self, builder: &mut AppBuilder) {
         builder
             .add_plugin(CrudPlugin::<Slide>::new())
-            .add_system(update_references.system());
+            .add_system(update_references.system())
+            .add_system(update_references_to_backgrounds.system());
     }
 }
 
@@ -78,10 +79,27 @@ impl Crudable for Slide {
     }
 }
 
+fn update_references_to_backgrounds(
+    mut events: EventReader<CrudEvent<Background>>,
+    mut query: Query<(Entity, &mut Slide)>,
+) {
+    for e in events.iter() {
+        match e {
+            CrudEvent::Renamed(old_name, new_name) => {
+                for (_, mut s) in query.iter_mut() {
+                    if s.background == *old_name {
+                        s.background = new_name.clone();
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 fn update_references(
     mut events: EventReader<CrudEvent<Slide>>,
     mut query: Query<(Entity, &mut Slide)>,
-    mut commands: Commands,
 ) {
     for e in events.iter() {
         match e {
