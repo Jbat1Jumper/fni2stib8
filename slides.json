@@ -13,7 +13,7 @@
   {
     "name": "LivingPoured",
     "description": "As you pour the glasses they seem to get away. When you pour the last one they all rise and then throw the contents on the floor.",
-    "background": "",
+    "background": "pool_table",
     "actions": [
       {
         "text": "What a waste...",
@@ -24,7 +24,7 @@
   {
     "name": "LivingBottle",
     "description": "You enter the living room and see the floating glasses again. As you came close to them they get float to you until you are surrounded. ",
-    "background": "",
+    "background": "pool_table",
     "actions": [
       {
         "text": "Pour whiskey into the floating glasses.",
@@ -50,7 +50,7 @@
   {
     "name": "SaloonBottle",
     "description": "You take the bottle and smile to the bartender. He smiles back to you in an odd whay, like if he was expecting something in return. What's up whit this guy?",
-    "background": "",
+    "background": "saloon",
     "actions": [
       {
         "text": "Go back to the living room.",
@@ -65,7 +65,7 @@
   {
     "name": "LivingStains",
     "description": "Yikes, the floor of the living room is all messed up. The only thing you can do now is to...",
-    "background": "",
+    "background": "livingStains",
     "actions": [
       {
         "text": "Forget about the stains",
@@ -76,7 +76,7 @@
   {
     "name": "AskingSaloonGuy",
     "description": "You ask the weird guy what is happening to him. He answers that he suffered a strange kind of face paralysis during his years in the military. And now the only thing that sooths the pain is having a bottle of something strong nearby.",
-    "background": "",
+    "background": "barman",
     "actions": [
       {
         "text": "I did not want to know that much",
@@ -87,7 +87,7 @@
   {
     "name": "SaloonBottleTruth",
     "description": "You stand still in the saloon thinking about how unfair life can be sometimes. You have your bottle in your hand.",
-    "background": "",
+    "background": "saloon",
     "actions": [
       {
         "text": "Ask again what happends to the bartender ",

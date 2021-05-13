@@ -176,7 +176,7 @@ fn images(
     egui_context: ResMut<EguiContext>,
     mut images: NonSendMut<ImagesRes>,
     mut commands: Commands,
-    backgrounds: Query<(&Background, &BackgroundData)>,
+    backgrounds: Query<(&Background, Option<&BackgroundData>)>,
     mut bg_persistence: EventWriter<PersistenceEvent<Background>>,
     mut bg_events: EventWriter<CrudEvent<Background>>,
 ) {
@@ -212,8 +212,12 @@ fn images(
             //     t.data.len()
             // ));
             //
+
             ui.horizontal(|ui| {
-                ui.image(bgd.ui_texture, [WIDTH as f32, 2. * HEIGHT as f32]);
+                ui.label(&bg.name);
+                if let Some(bgd) = bgd {
+                    ui.image(bgd.ui_texture, [WIDTH as f32, 2. * HEIGHT as f32]);
+                }
                 if ui.button("edit").clicked() {
                     commands.spawn().insert(BackgroundEditor::new_for(&bg.name));
                 }

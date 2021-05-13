@@ -7,5 +7,32 @@
       255,
       255
     ]
+  },
+  {
+    "name": "barman",
+    "url": "https://static3.abc.es/Media/201307/10/david-rios-bartender--644x362.JPG",
+    "color_channels": [
+      255,
+      255,
+      255
+    ]
+  },
+  {
+    "name": "saloon",
+    "url": "https://media-cdn.tripadvisor.com/media/photo-s/14/f9/eb/44/nuestra-barra-principal.jpg",
+    "color_channels": [
+      255,
+      255,
+      255
+    ]
+  },
+  {
+    "name": "livingStains",
+    "url": "https://www.drymastersystems.com/wp-content/uploads/2018/12/Untitled-design-3.png",
+    "color_channels": [
+      255,
+      255,
+      255
+    ]
   }
 ]
