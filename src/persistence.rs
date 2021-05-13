@@ -28,6 +28,7 @@ use std::path::Path;
 
 pub trait Persistable: Clone + Send + Sync + Serialize + DeserializeOwned {
     fn file_path() -> &'static Path;
+    fn sortable_name<'a>(&'a self) -> &'a str;
 }
 
 impl<R> PersistencePlugin<R>
@@ -67,7 +68,8 @@ where
                 }
                 PersistenceEvent::FileOut => {
                     info!("Writing to file!");
-                    let resources: Vec<R> = resources.iter().map(|(_, res)| res).cloned().collect();
+                    let mut resources: Vec<R> = resources.iter().map(|(_, res)| res).cloned().collect();
+                    resources.sort_by_key(|r|String::from(r.sortable_name()));
                     let f = File::create(R::file_path()).expect("Failed to write to resources file");
                     serde_json::to_writer_pretty(f, &resources)
                         .expect("Failed to rialize to resources files");

@@ -16,8 +16,7 @@ impl Plugin for EditorsPlugin {
             .add_system(SlideEditor::handle_renames.system())
             .add_system(AddSlidePrompt::render.system())
             .add_system(RenameDialog::<Slide>::render.system())
-            .add_system(DeleteSlideDialog::render.system())
-            .add_system(PersistConfirmationDialog::render.system());
+            .add_system(DeleteSlideDialog::render.system());
     }
 }
 struct DeleteSlideDialog(String);
@@ -124,39 +123,6 @@ impl<R: 'static + Crudable> RenameDialog<R> {
     }
 }
 
-struct PersistConfirmationDialog(PersistenceEvent<Slide>);
-
-impl PersistConfirmationDialog {
-    fn render(
-        egui_context: ResMut<EguiContext>,
-        mut commands: Commands,
-        dialog: Option<Res<Self>>,
-        mut fs_event: EventWriter<PersistenceEvent<Slide>>,
-    ) {
-        if dialog.is_none() {
-            return;
-        }
-        let dialog = dialog.unwrap();
-
-        egui::Window::new("Please confirm").show(egui_context.ctx(), |ui| {
-            ui.label(match dialog.0 {
-                PersistenceEvent::FileIn => "Doing a File In will erase all your unsaved changes.",
-                PersistenceEvent::FileOut => "Doing a File Out will override the file",
-                PersistenceEvent::_Phantom(_) => unreachable!(),
-            });
-            ui.horizontal(|ui| {
-                if ui.button("Proceed").clicked() {
-                    fs_event.send(dialog.0.clone());
-                    commands.remove_resource::<Self>();
-                }
-                if ui.button("Cancel").clicked() {
-                    commands.remove_resource::<Self>();
-                }
-            });
-        });
-    }
-}
-
 fn slide_list(
     egui_context: ResMut<EguiContext>,
     slides: Query<&Slide>,
@@ -167,12 +133,6 @@ fn slide_list(
         ui.horizontal(|ui| {
             if ui.button("Add new").clicked() {
                 commands.insert_resource(AddSlidePrompt::default());
-            }
-            if ui.button("File In").clicked() {
-                commands.insert_resource(PersistConfirmationDialog(PersistenceEvent::FileIn));
-            }
-            if ui.button("File Out").clicked() {
-                commands.insert_resource(PersistConfirmationDialog(PersistenceEvent::FileOut));
             }
         });
 

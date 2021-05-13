@@ -140,6 +140,9 @@ impl Persistable for Background {
     fn file_path() -> &'static Path {
         Path::new("backgrounds.json")
     }
+    fn sortable_name<'a>(&'a self) -> &'a str {
+        &self.name
+    }
 }
 impl crate::model::Crudable for Background {
     fn name(&self) -> String {
@@ -177,7 +180,6 @@ fn images(
     mut images: NonSendMut<ImagesRes>,
     mut commands: Commands,
     backgrounds: Query<(&Background, Option<&BackgroundData>)>,
-    mut bg_persistence: EventWriter<PersistenceEvent<Background>>,
     mut bg_events: EventWriter<CrudEvent<Background>>,
 ) {
     let valid_bg_names: Vec<_> = backgrounds.iter().map(|(bg, _)| bg.name.clone()).collect();
@@ -194,12 +196,6 @@ fn images(
                     url: "https://img.freepik.com/free-photo/question-mark-icon-glow-dark-3d-illustration_103740-348.jpg?size=626&ext=jpg".into(),
                     color_channels: (255, 255, 255),
                 }));
-            }
-            if ui.button("File In").clicked() {
-                bg_persistence.send(PersistenceEvent::FileIn);
-            }
-            if ui.button("File Out").clicked() {
-                bg_persistence.send(PersistenceEvent::FileOut);
             }
         });
         ui.separator();

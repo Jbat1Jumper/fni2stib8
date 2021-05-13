@@ -1,5 +1,16 @@
 [
   {
+    "name": "AskingSaloonGuy",
+    "description": "You ask the weird guy what is happening to him. He answers that he suffered a strange kind of face paralysis during his years in the military. And now the only thing that sooths the pain is having a bottle of something strong nearby.",
+    "background": "barman",
+    "actions": [
+      {
+        "text": "I did not want to know that much",
+        "target_slide": "SaloonBottleTruth"
+      }
+    ]
+  },
+  {
     "name": "Living",
     "description": "So, now all you see is a pool table and some whisky glasses floating above it. You do not understand why they are floating.",
     "background": "pool_table",
@@ -7,6 +18,17 @@
       {
         "text": "Go to the saloon",
         "target_slide": "Saloon"
+      }
+    ]
+  },
+  {
+    "name": "LivingBottle",
+    "description": "You enter the living room and see the floating glasses again. As you came close to them they get float to you until you are surrounded. ",
+    "background": "pool_table",
+    "actions": [
+      {
+        "text": "Pour whiskey into the floating glasses.",
+        "target_slide": "LivingPoured"
       }
     ]
   },
@@ -22,13 +44,13 @@
     ]
   },
   {
-    "name": "LivingBottle",
-    "description": "You enter the living room and see the floating glasses again. As you came close to them they get float to you until you are surrounded. ",
-    "background": "pool_table",
+    "name": "LivingStains",
+    "description": "Yikes, the floor of the living room is all messed up. The only thing you can do now is to...",
+    "background": "livingStains",
     "actions": [
       {
-        "text": "Pour whiskey into the floating glasses.",
-        "target_slide": "LivingPoured"
+        "text": "Forget about the stains",
+        "target_slide": "Living"
       }
     ]
   },
@@ -59,28 +81,6 @@
       {
         "text": "Ask guy what happens to him.",
         "target_slide": "AskingSaloonGuy"
-      }
-    ]
-  },
-  {
-    "name": "LivingStains",
-    "description": "Yikes, the floor of the living room is all messed up. The only thing you can do now is to...",
-    "background": "livingStains",
-    "actions": [
-      {
-        "text": "Forget about the stains",
-        "target_slide": "Living"
-      }
-    ]
-  },
-  {
-    "name": "AskingSaloonGuy",
-    "description": "You ask the weird guy what is happening to him. He answers that he suffered a strange kind of face paralysis during his years in the military. And now the only thing that sooths the pain is having a bottle of something strong nearby.",
-    "background": "barman",
-    "actions": [
-      {
-        "text": "I did not want to know that much",
-        "target_slide": "SaloonBottleTruth"
       }
     ]
   },

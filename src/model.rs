@@ -30,6 +30,9 @@ impl Persistable for Slide {
     fn file_path() -> &'static Path {
         Path::new("slides.json")
     }
+    fn sortable_name<'a>(&'a self) -> &'a str {
+        &self.name
+    }
 }
 
 impl Slide {
