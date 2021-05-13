@@ -88,6 +88,7 @@ impl Plugin for ImagesPlugin {
             .add_system(receive_images.system())
             .add_system(RenameDialog::<Background>::render.system())
             .add_system(auto_request_images.system())
+            .add_system(DeleteBgDialog::render.system())
             .add_system(BackgroundEditor::render.system())
             .add_system(BackgroundEditor::handle_renames.system())
             .add_system(images.system());
@@ -220,10 +221,58 @@ fn images(
                 if ui.button("rename").clicked() {
                     commands.insert_resource(RenameDialog::new_for(bg));
                 }
+                if ui.button("delete").clicked() {
+                    commands.insert_resource(DeleteBgDialog(bg.name.clone()));
+                }
             });
         }
     });
 }
+
+struct DeleteBgDialog(String);
+impl DeleteBgDialog {
+    fn render(
+        egui_context: ResMut<EguiContext>,
+        dialog: Option<ResMut<Self>>,
+        mut slide_events: EventWriter<CrudEvent<Background>>,
+        mut commands: Commands,
+        slides: Query<&crate::model::Slide>,
+    ) {
+        if dialog.is_none() {
+            return;
+        }
+        let mut dialog = dialog.unwrap();
+
+        let slides_with_references: Vec<_> = slides
+            .iter()
+            .filter(|s| s.background == dialog.0)
+            .map(|s| s.name.clone())
+            .collect();
+
+        egui::Window::new("Delete background").show(egui_context.ctx(), |ui| {
+            ui.horizontal(|ui| {
+                ui.label(format!("Goging to delete \"{}\"", dialog.0));
+            });
+            ui.horizontal(|ui| {
+                if ui.button("Cancel").clicked() {
+                    commands.remove_resource::<Self>();
+                }
+                if slides_with_references.is_empty() {
+                    if ui.button("Delete").clicked() {
+                        slide_events.send(CrudEvent::Deleted(dialog.0.clone()));
+                        commands.remove_resource::<Self>();
+                    }
+                } else {
+                    ui.colored_label(egui::Color32::RED, "Cant delete, has references from:");
+                    for r in slides_with_references {
+                        ui.label(r);
+                    }
+                }
+            });
+        });
+    }
+}
+
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 struct BackgroundEditor {
