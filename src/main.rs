@@ -54,9 +54,5 @@ fn debug(
         if ui.button("Quit").clicked() {
             app_exit.send(AppExit);
         }
-
-        if ui.button("Start").clicked() {
-            commands.insert_resource(player::StartPrompt("".into()));
-        }
     });
 }
