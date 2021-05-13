@@ -1,4 +1,4 @@
-use crate::model::*;
+use crate::{images::{Background, BackgroundData, convert_background_to_ascii}, model::*};
 use bevy::prelude::*;
 use bevy_egui::{
     egui::{self, ScrollArea, TextEdit},
@@ -11,14 +11,19 @@ impl Plugin for PlayerPlugin {
     fn build(&self, builder: &mut AppBuilder) {
         builder
             .insert_resource(Player::default())
+            .add_startup_system(Player::startup.system())
+            .add_system(Player::render_controls.system())
             .add_system(Player::render.system())
             .add_system(Player::handle_renames.system());
     }
 }
 
+struct DisplayText;
+
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 struct Player {
     current_slide: String,
+    current_rendered_text: String,
 }
 
 impl Player {
@@ -39,17 +44,63 @@ impl Player {
             }
         }
     }
+    fn startup(mut commands: Commands, asset_server: Res<AssetServer>) {
+        info!("Player starting up");
+        commands.spawn_bundle(Text2dBundle {
+            text: Text::with_section(
+                "Loading",
+                TextStyle {
+                    font: asset_server.load("fonts/BPtypewrite.otf"),
+                    font_size: 10.0,
+                    color: Color::WHITE,
+                    //..Default::default()
+                },
+                TextAlignment {
+                    vertical: VerticalAlign::Center,
+                    horizontal: HorizontalAlign::Center,
+                },
+            ),
+            ..Default::default()
+        }).insert(DisplayText);
+    }
+
     fn render(
-        player: Option<ResMut<Self>>,
-        slides: Query<(Entity, &Slide)>,
-        egui_context: ResMut<EguiContext>,
+        mut player: ResMut<Self>,
+        slides: Query<&Slide>,
+        backgrounds: Query<(&Background, &BackgroundData)>,
+        mut text: Query<&mut Text, With<DisplayText>>,
         mut commands: Commands,
     ) {
-        if player.is_none() {
-            return;
+        let rendered_text = match slides
+                .iter()
+                .find(|slide| slide.name == player.current_slide) {
+                    None => "-.- Slide not found -'-".into(),
+                    Some(slide) => {
+                        match backgrounds.iter().find(|(bg, _)| bg.name() == slide.background) {
+                            None => "-'- No background -.-".into(),
+                            Some((bg, bgd)) => convert_background_to_ascii(bg, bgd),
+                        }
+
+                    }
+                };
+        if player.current_rendered_text != rendered_text {
+            info!("Changed rendered text");
+            for mut t in text.iter_mut() {
+                info!("Changing text in a text component");
+                t.sections.first_mut().unwrap().value = rendered_text.clone();
+            }
+            player.current_rendered_text = rendered_text;
         }
-        let mut player = player.unwrap();
-        let valid_slide_names: Vec<_> = slides.iter().map(|(_, s)| s.name.clone()).collect();
+    }
+
+    fn render_controls(
+        mut player: ResMut<Self>,
+        slides: Query<&Slide>,
+        egui_context: ResMut<EguiContext>,
+        mut text: Query<(&mut Text, &mut Transform), With<DisplayText>>,
+        mut commands: Commands,
+    ) {
+        let valid_slide_names: Vec<_> = slides.iter().map(|s| s.name.clone()).collect();
         egui::Window::new("Player Controls").show(egui_context.ctx(), |ui| {
             egui::ComboBox::from_label("Current slide")
                 .selected_text(&player.current_slide)
@@ -59,15 +110,24 @@ impl Player {
                     }
                 });
             ui.separator();
+            for (mut text, mut transform) in text.iter_mut() {
+                ui.label("Text position");
+                ui.add(egui::DragValue::new(&mut transform.translation.x).speed(1.));
+                ui.add(egui::DragValue::new(&mut transform.translation.y).speed(1.));
+
+                ui.label("Font size");
+                ui.add(egui::DragValue::new(&mut text.sections.first_mut().unwrap().style.font_size).speed(1.).clamp_range(6..=40));
+            }
+            ui.separator();
 
             let s = slides
                 .iter()
-                .find(|(_, slide)| slide.name == player.current_slide);
+                .find(|slide| slide.name == player.current_slide);
             if s.is_none() {
                 ui.colored_label(egui::Color32::RED, "The current slide does not exist");
                 return;
             }
-            let (_scene_entity, scene) = s.unwrap();
+            let scene = s.unwrap();
             ui.add(
                 TextEdit::multiline(&mut scene.description.clone())
                     .text_style(egui::TextStyle::Monospace)

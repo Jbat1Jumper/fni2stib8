@@ -153,7 +153,7 @@ impl crate::model::Crudable for Background {
     }
 }
 
-struct BackgroundData {
+pub struct BackgroundData {
     image: RgbaImage,
     texture_handle: Handle<Texture>,
     ui_texture: egui::TextureId,
@@ -317,7 +317,7 @@ impl BackgroundEditor {
     }
 }
 
-fn convert_background_to_ascii(bg: &Background, bgd: &BackgroundData) -> String {
+pub fn convert_background_to_ascii(bg: &Background, bgd: &BackgroundData) -> String {
     bgd.image
         .pixels()
         .map(|p| pixel_to_intensity(bg, p))

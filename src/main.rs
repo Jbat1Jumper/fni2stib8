@@ -23,6 +23,7 @@ pub fn main() {
             ..Default::default()
         })
         .insert_resource(EguiSettings { scale_factor: 1.0 })
+        .insert_resource(ClearColor(Color::rgb(0., 0., 0.)))
         .add_plugins(DefaultPlugins)
         .add_plugin(EguiPlugin)
         .add_plugin(model::ModelPlugin)
@@ -36,13 +37,14 @@ pub fn main() {
 }
 
 fn on_startup(
-    mut _commands: Commands,
+    mut commands: Commands,
     mut persistence: EventWriter<PersistenceEvent<model::Slide>>,
     mut persistence_bg: EventWriter<PersistenceEvent<images::Background>>,
 ) {
     info!("Started!");
     persistence.send(PersistenceEvent::FileIn);
     persistence_bg.send(PersistenceEvent::FileIn);
+    commands.spawn_bundle(OrthographicCameraBundle::new_2d());
 }
 
 fn debug(
