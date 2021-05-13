@@ -10,7 +10,7 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, builder: &mut AppBuilder) {
         builder
-            .insert_resource(Player::default())
+            .insert_resource(Player::new())
             .add_startup_system(Player::startup.system())
             .add_system(Player::render_controls.system())
             .add_system(Player::render.system())
@@ -20,10 +20,21 @@ impl Plugin for PlayerPlugin {
 
 struct DisplayText;
 
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
+#[derive(Debug, Default)]
 struct Player {
     current_slide: String,
     current_rendered_text: String,
+    render_timer: Timer,
+}
+
+impl Player {
+    fn new() -> Self {
+        Self {
+            current_slide: "Living".into(),
+            current_rendered_text: ".".into(),
+            render_timer: Timer::from_seconds(1., true),
+        }
+    }
 }
 
 impl Player {
@@ -67,10 +78,14 @@ impl Player {
     fn render(
         mut player: ResMut<Self>,
         slides: Query<&Slide>,
+        time: Res<Time>,
         backgrounds: Query<(&Background, &BackgroundData)>,
         mut text: Query<&mut Text, With<DisplayText>>,
         mut commands: Commands,
     ) {
+        if !player.render_timer.tick(time.delta()).just_finished() {
+            return;
+        }
         let rendered_text = match slides
                 .iter()
                 .find(|slide| slide.name == player.current_slide) {

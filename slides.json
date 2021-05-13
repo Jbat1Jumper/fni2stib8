@@ -35,7 +35,7 @@
   {
     "name": "Saloon",
     "description": "You enter the saloon and the bartender looks at you intrigued. He offers you a bottle of whisky.",
-    "background": "",
+    "background": "saloon",
     "actions": [
       {
         "text": "Accept the bottle.",
