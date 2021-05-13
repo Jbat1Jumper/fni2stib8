@@ -178,27 +178,22 @@ fn images(
     mut commands: Commands,
     backgrounds: Query<(&Background, &BackgroundData)>,
     mut bg_persistence: EventWriter<PersistenceEvent<Background>>,
+    mut bg_events: EventWriter<CrudEvent<Background>>,
 ) {
-    egui::Window::new("Download Image").show(egui_context.ctx(), |ui| {
-        ui.label("URL:");
-        ui.text_edit_singleline(&mut images.url);
-        if ui.button("Request").clicked() {
-            let e = commands
-                .spawn()
-                .insert(Background {
-                    name: images.url.clone(),
-                    url: images.url.clone(),
-                    color_channels: (255, 255, 255),
-                })
-                .id();
-        }
-        ui.separator();
-    });
-
+    let valid_bg_names: Vec<_> = backgrounds.iter().map(|(bg, _)| bg.name.clone()).collect();
     egui::Window::new("Images").show(egui_context.ctx(), |ui| {
         ui.horizontal(|ui| {
             if ui.button("Add New").clicked() {
-                bg_persistence.send(PersistenceEvent::FileIn);
+                let new_name = (0..10000)
+                    .map(|n| format!("background{}", n))
+                    .filter(|name| !valid_bg_names.contains(name))
+                    .next()
+                    .expect("Abusrd amount of badly named slides");
+                bg_events.send(CrudEvent::Created(Background {
+                    name: new_name,
+                    url: "https://img.freepik.com/free-photo/question-mark-icon-glow-dark-3d-illustration_103740-348.jpg?size=626&ext=jpg".into(),
+                    color_channels: (255, 255, 255),
+                }));
             }
             if ui.button("File In").clicked() {
                 bg_persistence.send(PersistenceEvent::FileIn);
