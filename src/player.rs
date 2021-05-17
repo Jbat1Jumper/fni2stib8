@@ -25,6 +25,7 @@ struct Player {
     current_slide: String,
     current_rendered_text: String,
     render_timer: Timer,
+    render: bool,
 }
 
 impl Player {
@@ -33,6 +34,7 @@ impl Player {
             current_slide: "Living".into(),
             current_rendered_text: ".".into(),
             render_timer: Timer::from_seconds(1., true),
+            render: false,
         }
     }
 }
@@ -83,7 +85,7 @@ impl Player {
         mut text: Query<&mut Text, With<DisplayText>>,
         mut commands: Commands,
     ) {
-        if !player.render_timer.tick(time.delta()).just_finished() {
+        if !player.render_timer.tick(time.delta()).just_finished() || !player.render {
             return;
         }
         let rendered_text = match slides
@@ -124,6 +126,13 @@ impl Player {
                         ui.selectable_value(&mut player.current_slide, sn.clone(), sn);
                     }
                 });
+            ui.separator();
+            ui.checkbox(&mut player.render, "Render on");
+            if ui.button("Clear rendered text").clicked() {
+                for (mut text, mut _transform) in text.iter_mut() {
+                    text.sections.first_mut().unwrap().value = "CLEARED".into();
+                }
+            }
             ui.separator();
             for (mut text, mut transform) in text.iter_mut() {
                 ui.label("Text position");

@@ -362,6 +362,7 @@ impl BackgroundEditor {
 }
 
 pub fn convert_background_to_ascii(bg: &Background, bgd: &BackgroundData) -> String {
+    info!("Converting {} to ascii", bg.name);
     bgd.image
         .pixels()
         .map(|p| pixel_to_intensity(bg, p))
@@ -386,7 +387,7 @@ fn pixel_to_intensity(bg: &Background, p: &image::Rgba<u8>) -> u8 {
 // Copied from edelsonc/asciify
 fn intensity_to_ascii(value: u8) -> &'static str {
     let ascii_chars = [
-        " ", ".", "^", ",", ":", "_", "=", "~", "+", "O", "o", "*", "#", "&", "%", "B", "@", "$",
+        ".", "^", ",", ":", "_", "=", "~", "+", "O", "o", "*", "#", "&", "%", "B", "@", "$",
     ];
 
     let n_chars = ascii_chars.len() as u8;
