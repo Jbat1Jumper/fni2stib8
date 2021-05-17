@@ -8,6 +8,8 @@ use crate::{images::Background, persistence::Persistable};
 
 pub struct ModelPlugin;
 
+pub struct EditorsOpen(pub bool);
+
 impl Plugin for ModelPlugin {
     fn build(&self, builder: &mut AppBuilder) {
         builder

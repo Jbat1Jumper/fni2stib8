@@ -27,6 +27,7 @@ impl DeleteSlideDialog {
         mut slide_events: EventWriter<CrudEvent<Slide>>,
         mut commands: Commands,
         slides: Query<&Slide>,
+        editors_open: Res<EditorsOpen>,
     ) {
         if dialog.is_none() {
             return;
@@ -39,6 +40,7 @@ impl DeleteSlideDialog {
             .map(|s| s.name.clone())
             .collect();
 
+        if !editors_open.0  { return; }
         egui::Window::new("Delete slide").show(egui_context.ctx(), |ui| {
             ui.horizontal(|ui| {
                 ui.label(format!("Goging to delete \"{}\"", dialog.0));
@@ -83,12 +85,14 @@ impl<R: 'static + Crudable> RenameDialog<R> {
         mut crud_events: EventWriter<CrudEvent<R>>,
         mut commands: Commands,
         resources: Query<&R>,
+        editors_open: Res<EditorsOpen>,
     ) {
         if dialog.is_none() {
             return;
         }
         let mut dialog = dialog.unwrap();
 
+        if !editors_open.0  { return; }
         egui::Window::new(format!("Rename {}", R::default_name_prefix())).show(
             egui_context.ctx(),
             |ui| {
@@ -128,7 +132,9 @@ fn slide_list(
     slides: Query<&Slide>,
     mut commands: Commands,
     mut slide_events: EventWriter<CrudEvent<Slide>>,
+    editors_open: Res<EditorsOpen>,
 ) {
+    if !editors_open.0  { return; }
     egui::Window::new("Slides").show(egui_context.ctx(), |ui| {
         ui.horizontal(|ui| {
             if ui.button("Add new").clicked() {
@@ -191,8 +197,11 @@ impl SlideEditor {
         backgrounds: Query<&Background>,
         mut slide_events: EventWriter<CrudEvent<Slide>>,
         mut commands: Commands,
+        editors_open: Res<EditorsOpen>,
     ) {
         let valid_slide_names: Vec<_> = slides.iter().map(|s| s.name.clone()).collect();
+
+        if !editors_open.0  { return; }
 
         for (eid, mut e) in editors.iter_mut() {
             let saved = match slides.iter().filter(|s| s.name == e.target).next() {
@@ -331,7 +340,9 @@ impl AddSlidePrompt {
         mut commands: Commands,
         mut slide_events: EventWriter<CrudEvent<Slide>>,
         slides: Query<(Entity, &Slide)>,
+        editors_open: Res<EditorsOpen>,
     ) {
+        if !editors_open.0  { return; }
         if let Some(mut prompt) = prompt {
             egui::Window::new("Create new Slide").show(egui_context.ctx(), |ui| {
                 ui.horizontal(|ui| {

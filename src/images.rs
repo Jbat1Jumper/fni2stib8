@@ -1,4 +1,5 @@
 use serde::*;
+use crate::model::EditorsOpen;
 use std::{
     io::Read,
     path::Path,
@@ -182,8 +183,12 @@ fn images(
     mut commands: Commands,
     backgrounds: Query<(&Background, Option<&BackgroundData>)>,
     mut bg_events: EventWriter<CrudEvent<Background>>,
+    editors_open: Res<EditorsOpen>,
 ) {
     let valid_bg_names: Vec<_> = backgrounds.iter().map(|(bg, _)| bg.name.clone()).collect();
+    if !editors_open.0 {
+        return;
+    }
     egui::Window::new("Images").show(egui_context.ctx(), |ui| {
         ui.horizontal(|ui| {
             if ui.button("Add New").clicked() {
@@ -237,6 +242,7 @@ impl DeleteBgDialog {
         mut slide_events: EventWriter<CrudEvent<Background>>,
         mut commands: Commands,
         slides: Query<&crate::model::Slide>,
+        editors_open: Res<EditorsOpen>,
     ) {
         if dialog.is_none() {
             return;
@@ -249,6 +255,9 @@ impl DeleteBgDialog {
             .map(|s| s.name.clone())
             .collect();
 
+        if !editors_open.0 {
+            return;
+        }
         egui::Window::new("Delete background").show(egui_context.ctx(), |ui| {
             ui.horizontal(|ui| {
                 ui.label(format!("Goging to delete \"{}\"", dialog.0));
@@ -272,7 +281,6 @@ impl DeleteBgDialog {
         });
     }
 }
-
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 struct BackgroundEditor {
@@ -308,6 +316,7 @@ impl BackgroundEditor {
         backgrounds: Query<(Entity, &Background, &BackgroundData)>,
         mut bg_events: EventWriter<CrudEvent<Background>>,
         mut commands: Commands,
+        editors_open: Res<EditorsOpen>,
     ) {
         for (editor_id, mut editor) in editors.iter_mut() {
             let (bg_entity, saved, bdata) = match backgrounds
@@ -321,6 +330,9 @@ impl BackgroundEditor {
                 }
                 Some(s) => s,
             };
+            if !editors_open.0 {
+                return;
+            }
             let mut unsaved = saved.clone();
             let mut open = true;
             egui::Window::new(format!("Edit: {}", saved.name))

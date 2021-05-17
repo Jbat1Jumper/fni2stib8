@@ -1,12 +1,14 @@
 use bevy::{
     app::AppExit,
     diagnostic::Diagnostics,
+    input::keyboard::KeyboardInput,
     log::{Level, LogSettings},
 };
 #[macro_use]
 use bevy::prelude::*;
 //use bevy::render::camera::OrthographicProjection;
 use bevy_egui::{egui, EguiContext, EguiPlugin, EguiSettings};
+use model::EditorsOpen;
 
 mod editors;
 mod images;
@@ -22,6 +24,7 @@ pub fn main() {
             level: Level::DEBUG,
             ..Default::default()
         })
+        .insert_resource(EditorsOpen(true))
         .insert_resource(EguiSettings { scale_factor: 1.0 })
         .insert_resource(ClearColor(Color::rgb(0., 0., 0.)))
         .add_plugins(DefaultPlugins)
@@ -52,18 +55,28 @@ fn debug(
     egui_context: ResMut<EguiContext>,
     mut commands: Commands,
     mut app_exit: EventWriter<AppExit>,
+    mut buttons: EventReader<KeyboardInput>,
+    mut editors_open: ResMut<EditorsOpen>,
 ) {
-    egui::Window::new("Main menu").show(egui_context.ctx(), |ui| {
-        if ui.button("File In").clicked() {
-            commands.insert_resource(PersistConfirmationDialog(PersistenceEvent::FileIn));
+    if editors_open.0 {
+        egui::Window::new("Main menu").show(egui_context.ctx(), |ui| {
+            if ui.button("File In").clicked() {
+                commands.insert_resource(PersistConfirmationDialog(PersistenceEvent::FileIn));
+            }
+            if ui.button("File Out").clicked() {
+                commands.insert_resource(PersistConfirmationDialog(PersistenceEvent::FileOut));
+            }
+            if ui.button("Quit").clicked() {
+                app_exit.send(AppExit);
+            }
+        });
+    }
+
+    for ev in buttons.iter() {
+        if ev.key_code == Some(KeyCode::E) && ev.state.is_pressed() {
+            editors_open.0 = !editors_open.0;
         }
-        if ui.button("File Out").clicked() {
-            commands.insert_resource(PersistConfirmationDialog(PersistenceEvent::FileOut));
-        }
-        if ui.button("Quit").clicked() {
-            app_exit.send(AppExit);
-        }
-    });
+    }
 }
 
 struct PersistConfirmationDialog(PersistenceEvent<()>);

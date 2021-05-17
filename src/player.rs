@@ -15,10 +15,9 @@ impl Plugin for PlayerPlugin {
         builder
             .insert_resource(Player::new())
             .insert_resource(PlayerState::FadeInBg(Timer::from_seconds(
-                BG_FADE_IN, false,
+                BG_FADE_IN*3.0, false,
             )))
             .add_startup_system(Player::startup.system())
-            .add_system(Player::render_controls.system())
             .add_system(Player::render.system())
             .add_system(Player::handle_mouse.system())
             .add_system(Player::update_state.system())
@@ -260,7 +259,7 @@ impl Player {
         commands
             .spawn_bundle(Text2dBundle {
                 text: Text::with_section(
-                    "Loading",
+                    "...",
                     TextStyle {
                         font: asset_server.load("fonts/BPtypewrite.otf"),
                         font_size: 12.0,
@@ -282,7 +281,7 @@ impl Player {
         commands
             .spawn_bundle(Text2dBundle {
                 text: Text::with_section(
-                    "Description",
+                    ".",
                     TextStyle {
                         font: asset_server.load("fonts/BPtypewrite.otf"),
                         font_size: 12.0,
@@ -304,7 +303,7 @@ impl Player {
         commands
             .spawn_bundle(Text2dBundle {
                 text: Text::with_section(
-                    "Actions",
+                    "...",
                     TextStyle {
                         font: asset_server.load("fonts/BPtypewrite.otf"),
                         font_size: 12.0,
