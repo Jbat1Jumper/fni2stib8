@@ -1,7 +1,7 @@
 [
   {
     "name": "AskingSaloonGuy",
-    "description": "You ask the weird guy what is happening to him. He answers that he suffered a strange kind of face paralysis during his years in the military. And now the only thing that sooths the pain is having a bottle of something strong nearby.",
+    "description": "You ask the weird guy what is happening to him. \nHe answers that he suffered a strange kind of face paralysis during his years in the military. \nAnd now the only thing that sooths the pain is having a bottle of something strong nearby.",
     "background": "barman",
     "actions": [
       {
@@ -23,7 +23,7 @@
   },
   {
     "name": "LivingBottle",
-    "description": "You enter the living room and see the floating glasses again. As you came close to them they get float to you until you are surrounded. ",
+    "description": "You enter the living room and see the floating glasses again. \nAs you came close to them they get float to you until you are surrounded. ",
     "background": "pool_table",
     "actions": [
       {
@@ -34,7 +34,7 @@
   },
   {
     "name": "LivingPoured",
-    "description": "As you pour the glasses they seem to get away. When you pour the last one they all rise and then throw the contents on the floor.",
+    "description": "As you pour the glasses they seem to get away. \nWhen you pour the last one they all rise and then throw the contents on the floor.",
     "background": "pool_table",
     "actions": [
       {
@@ -71,7 +71,7 @@
   },
   {
     "name": "SaloonBottle",
-    "description": "You take the bottle and smile to the bartender. He smiles back to you in an odd whay, like if he was expecting something in return. What's up whit this guy?",
+    "description": "You take the bottle and smile to the bartender. \nHe smiles back to you in an odd whay, like if he was expecting something in return. \nWhat's up whit this guy?",
     "background": "saloon",
     "actions": [
       {
@@ -86,7 +86,7 @@
   },
   {
     "name": "SaloonBottleTruth",
-    "description": "You stand still in the saloon thinking about how unfair life can be sometimes. You have your bottle in your hand.",
+    "description": "You stand still in the saloon thinking about how unfair life can be sometimes. \nYou have your bottle in your hand.",
     "background": "saloon",
     "actions": [
       {

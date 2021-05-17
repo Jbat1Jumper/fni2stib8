@@ -148,10 +148,10 @@ impl Player {
     }
 }
 
-const BG_FADE_IN: f32 = 3.0 / 2.0;
-const BG_FADE_OUT: f32 = 2.0 / 2.0;
+const BG_FADE_IN: f32 = 3.0;
+const BG_FADE_OUT: f32 = 2.0;
 const MEAN_WORD_LENGTH: f32 = 4.7;
-const MEAN_READING_SPEED_WPS: f32 = 3.6 * 5.0;
+const MEAN_READING_SPEED_WPS: f32 = 4.0;
 
 impl Player {
     fn new() -> Self {

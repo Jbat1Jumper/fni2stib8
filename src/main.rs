@@ -24,7 +24,7 @@ pub fn main() {
             level: Level::DEBUG,
             ..Default::default()
         })
-        .insert_resource(EditorsOpen(true))
+        .insert_resource(EditorsOpen(false))
         .insert_resource(EguiSettings { scale_factor: 1.0 })
         .insert_resource(ClearColor(Color::rgb(0., 0., 0.)))
         .add_plugins(DefaultPlugins)
