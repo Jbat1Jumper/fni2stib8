@@ -344,7 +344,7 @@ impl BackgroundEditor {
                         }
                     });
                     ui.separator();
-                    let mut ascii = convert_background_to_ascii(saved, bdata);
+                    let mut ascii = convert_background_to_ascii(saved, bdata, 1.0);
                     ui.add(
                         egui::TextEdit::multiline(&mut ascii)
                             .text_style(egui::TextStyle::Monospace)
@@ -361,11 +361,12 @@ impl BackgroundEditor {
     }
 }
 
-pub fn convert_background_to_ascii(bg: &Background, bgd: &BackgroundData) -> String {
+pub fn convert_background_to_ascii(bg: &Background, bgd: &BackgroundData, alpha: f32) -> String {
     info!("Converting {} to ascii", bg.name);
     bgd.image
         .pixels()
         .map(|p| pixel_to_intensity(bg, p))
+        .map(|i| (i as f32 * alpha) as u8)
         .map(|i| intensity_to_ascii(i))
         .collect::<Vec<_>>()
         .chunks(WIDTH as usize)
