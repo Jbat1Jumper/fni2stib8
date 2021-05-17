@@ -2,7 +2,7 @@ use crate::{
     images::{convert_background_to_ascii, Background, BackgroundData},
     model::*,
 };
-use bevy::prelude::*;
+use bevy::{input::{ElementState, mouse::MouseButtonInput}, prelude::*, render::camera::Camera};
 use bevy_egui::{
     egui::{self, ScrollArea, TextEdit},
     EguiContext,
@@ -20,6 +20,7 @@ impl Plugin for PlayerPlugin {
             .add_startup_system(Player::startup.system())
             .add_system(Player::render_controls.system())
             .add_system(Player::render.system())
+            .add_system(Player::handle_mouse.system())
             .add_system(Player::update_state.system())
             .add_system(Player::handle_renames.system());
     }
@@ -37,6 +38,8 @@ struct Player {
     percentage_of_text_shown: f32,
     amount_of_actions_shown: f32,
     render_timer: Timer,
+    hovering_action: Option<usize>,
+    dashes: usize,
     render: bool,
     pauses: f32,
     action_pause: f32,
@@ -49,7 +52,7 @@ enum PlayerState {
     FadeInText(Timer),
     PauseBetweenTextAndActions(Timer),
     FadeInActions(Timer),
-    WaitingForInput,
+    WaitingForInput(Timer),
     GotInput,
     FadeOutTextAndActions(Timer),
     FadeOutBg(Timer),
@@ -111,8 +114,12 @@ impl Player {
                 if timer.tick(time.delta()).just_finished() {
                     info!("FadeInActions finished");
                     player.amount_of_actions_shown = 1.0;
-                    *state = WaitingForInput;
+                    *state = WaitingForInput(Timer::from_seconds(1.0, true));
                 }
+            }
+            WaitingForInput(ref mut timer) => {
+                player.dashes = (timer.percent() * 4.0) as usize;
+                if timer.tick(time.delta()).just_finished() {}
             }
             GotInput => *state = FadeOutTextAndActions(Timer::from_seconds(0.5, false)),
             FadeOutTextAndActions(ref mut timer) => {
@@ -139,10 +146,10 @@ impl Player {
     }
 }
 
-const BG_FADE_IN: f32 = 3.0;
-const BG_FADE_OUT: f32 = 2.0;
+const BG_FADE_IN: f32 = 3.0 / 2.0;
+const BG_FADE_OUT: f32 = 2.0 / 2.0;
 const MEAN_WORD_LENGTH: f32 = 4.7;
-const MEAN_READING_SPEED_WPS: f32 = 3.6;
+const MEAN_READING_SPEED_WPS: f32 = 3.6 * 5.0;
 
 impl Player {
     fn new() -> Self {
@@ -151,16 +158,91 @@ impl Player {
             next_slide: "Living".into(),
             render_timer: Timer::from_seconds(0.1, true),
             render: true,
-            pauses: 1.0,
+            pauses: 0.1, // 1.0
+            dashes: 0,
             percentage_of_text_shown: 0.0,
             amount_of_actions_shown: 0.0,
+            hovering_action: None,
             bg_opacity: 0.0,
-            action_pause: 1.0,
+            action_pause: 0.1,  // 1.0
         }
     }
 }
 
+fn window_to_world(
+    window: &Window,
+    camera: &Transform,
+    position: &Vec2,
+) -> Vec3 {
+    let center = camera.translation.truncate();
+    let half_width = (window.width() / 2.0) * camera.scale.x;
+    let half_height = (window.height() / 2.0) * camera.scale.y;
+    let left = center.x - half_width;
+    let bottom = center.y - half_height;
+    Vec3::new(
+        left + position.x * camera.scale.x,
+        bottom + position.y * camera.scale.y,
+        0.0,  // I'm working in 2D
+    )
+}
+
 impl Player {
+    fn handle_mouse(
+        mut cursor_moved: EventReader<CursorMoved>,
+        mut mouse_button: EventReader<MouseButtonInput>,
+        mut player: ResMut<Self>,
+        mut player_state: ResMut<PlayerState>,
+        transforms: QuerySet<(
+            Query<&Transform, With<DisplayActions>>,
+            Query<&Transform, With<Camera>>,
+        )>,
+        windows: Res<Windows>,
+        time: Res<Time>,
+        slides: Query<&Slide>,
+    ) {
+        let slide = slides
+            .iter()
+            .find(|slide| slide.name == player.current_slide);
+        if slide.is_none() {
+            return;
+        }
+        let slide = slide.unwrap();
+        let offset_between_actions = 30.0;
+        let mut action_origin = 0.0;
+        let min_distance = 30;
+        for at in transforms.q0().iter() {
+            action_origin = at.translation.y;
+        }
+        let camera = transforms.q1().iter().find(|_| true).unwrap();
+        for CursorMoved { position, id } in cursor_moved.iter() {
+            let window = windows.get(*id).unwrap();
+            let position = window_to_world(window, camera, position);
+            info!("CursorMoved {:?}", position);
+            let mut distances = vec![];
+            for (i, _a) in slide.actions.iter().enumerate() {
+                let d =
+                    (action_origin - i as f32 * offset_between_actions - position.y).abs() as i32;
+                if d < min_distance {
+                    distances.push((i, d));
+                }
+            }
+            player.hovering_action = distances
+                .into_iter()
+                .min_by_key(|(_, distance_to_mouse)| *distance_to_mouse)
+                .map(|(i, _)| i);
+        }
+        for MouseButtonInput { button, state } in mouse_button.iter() {
+            if *button == MouseButton::Left && state.is_pressed() {
+
+                if let Some(i) = player.hovering_action.clone() {
+                    let a = slide.actions.get(i).unwrap();
+                    player.next_slide = a.target_slide.clone();
+                    *player_state = PlayerState::GotInput;
+                }
+            }
+        }
+    }
+
     fn handle_renames(mut player: ResMut<Self>, mut slide_events: EventReader<CrudEvent<Slide>>) {
         for ev in slide_events.iter() {
             match ev {
@@ -295,10 +377,18 @@ impl Player {
                         let mut actions_text = String::new();
                         let n_actions =
                             (slide.actions.len() as f32 * player.amount_of_actions_shown) as usize;
-                        for a in slide.actions.iter().take(n_actions) {
-                            actions_text += " > ";
+                        for (i, a) in slide.actions.iter().enumerate().take(n_actions) {
+                            if player.hovering_action == Some(i) {
+                                actions_text += &"-".repeat(player.dashes);
+                                actions_text += "> ";
+                                actions_text += &" ".repeat(5 - player.dashes);
+                            }
                             actions_text += &a.text;
-                            actions_text += " < ";
+                            if player.hovering_action == Some(i) {
+                                actions_text += &" ".repeat(5 - player.dashes);
+                                actions_text += " <";
+                                actions_text += &"-".repeat(player.dashes);
+                            }
                             actions_text += "\n\n";
                         }
                         for mut t in texts.q2_mut().iter_mut() {
@@ -371,10 +461,14 @@ impl Player {
                     .enabled(false),
             );
             ui.separator();
-            for a in scene.actions.iter() {
-                if ui.button(&a.text).clicked() {
+            for (i, a) in scene.actions.iter().enumerate() {
+                let res = ui.button(&a.text);
+                if res.clicked() {
                     player.next_slide = a.target_slide.clone();
                     *player_state = PlayerState::GotInput;
+                }
+                if res.hovered() {
+                    player.hovering_action = Some(i);
                 }
             }
         });
