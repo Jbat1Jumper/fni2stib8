@@ -25,7 +25,9 @@ impl Plugin for PlayerPlugin {
     }
 }
 
-struct DisplayText;
+struct DisplayBackground;
+struct DisplayDescription;
+struct DisplayActions;
 
 #[derive(Debug)]
 struct Player {
@@ -34,7 +36,6 @@ struct Player {
     bg_opacity: f32,
     percentage_of_text_shown: f32,
     amount_of_actions_shown: f32,
-    current_rendered_bg_text: String,
     render_timer: Timer,
     render: bool,
     pauses: f32,
@@ -148,7 +149,6 @@ impl Player {
         Self {
             current_slide: "Living".into(),
             next_slide: "Living".into(),
-            current_rendered_bg_text: ".".into(),
             render_timer: Timer::from_seconds(0.1, true),
             render: true,
             pauses: 1.0,
@@ -186,13 +186,61 @@ impl Player {
                         //..Default::default()
                     },
                     TextAlignment {
-                        vertical: VerticalAlign::Center,
+                        vertical: VerticalAlign::Bottom,
                         horizontal: HorizontalAlign::Center,
                     },
                 ),
+                transform: Transform {
+                    translation: Vec3::new(000.0, 350.0, 0.0),
+                    ..Default::default()
+                },
                 ..Default::default()
             })
-            .insert(DisplayText);
+            .insert(DisplayBackground);
+        commands
+            .spawn_bundle(Text2dBundle {
+                text: Text::with_section(
+                    "Description",
+                    TextStyle {
+                        font: asset_server.load("fonts/BPtypewrite.otf"),
+                        font_size: 10.0,
+                        color: Color::WHITE,
+                        //..Default::default()
+                    },
+                    TextAlignment {
+                        vertical: VerticalAlign::Bottom,
+                        horizontal: HorizontalAlign::Center,
+                    },
+                ),
+                transform: Transform {
+                    translation: Vec3::new(000.0, 0.0, 0.0),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(DisplayDescription);
+        commands
+            .spawn_bundle(Text2dBundle {
+                text: Text::with_section(
+                    "Actions",
+                    TextStyle {
+                        font: asset_server.load("fonts/BPtypewrite.otf"),
+                        font_size: 10.0,
+                        color: Color::WHITE,
+                        //..Default::default()
+                    },
+                    TextAlignment {
+                        vertical: VerticalAlign::Bottom,
+                        horizontal: HorizontalAlign::Center,
+                    },
+                ),
+                transform: Transform {
+                    translation: Vec3::new(000.0, -40.0, 0.0),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(DisplayActions);
     }
 
     fn render(
@@ -200,35 +248,69 @@ impl Player {
         slides: Query<&Slide>,
         time: Res<Time>,
         backgrounds: Query<(&Background, &BackgroundData)>,
-        mut text: Query<&mut Text, With<DisplayText>>,
+        mut texts: QuerySet<(
+            Query<&mut Text, With<DisplayBackground>>,
+            Query<&mut Text, With<DisplayDescription>>,
+            Query<&mut Text, With<DisplayActions>>,
+        )>,
         mut commands: Commands,
     ) {
         if !player.render_timer.tick(time.delta()).just_finished() || !player.render {
             return;
         }
-        let rendered_text = match slides
+        match slides
             .iter()
             .find(|slide| slide.name == player.current_slide)
         {
-            None => "-.- Slide not found -'-".into(),
+            None => {
+                warn!("slide not found");
+            }
             Some(slide) => {
                 match backgrounds
                     .iter()
                     .find(|(bg, _)| bg.name() == slide.background)
                 {
-                    None => "-'- No background -.-".into(),
-                    Some((bg, bgd)) => convert_background_to_ascii(bg, bgd, player.bg_opacity),
-                }
+                    None => warn!("background not found"),
+                    Some((bg, bgd)) => {
+                        let rendered_text = convert_background_to_ascii(bg, bgd, player.bg_opacity);
+                        for mut t in texts.q0_mut().iter_mut() {
+                            if t.sections.first().unwrap().value != rendered_text {
+                                info!("Changing text in a bg_text component");
+                                t.sections.first_mut().unwrap().value = rendered_text.clone();
+                            }
+                        }
+
+                        let mut description_text = slide.description.clone();
+                        description_text.truncate(
+                            (description_text.len() as f32 * player.percentage_of_text_shown)
+                                as usize,
+                        );
+                        for mut t in texts.q1_mut().iter_mut() {
+                            if t.sections.first().unwrap().value != description_text {
+                                info!("Changing text in a desc_text component");
+                                t.sections.first_mut().unwrap().value = description_text.clone();
+                            }
+                        }
+
+                        let mut actions_text = String::new();
+                        let n_actions =
+                            (slide.actions.len() as f32 * player.amount_of_actions_shown) as usize;
+                        for a in slide.actions.iter().take(n_actions) {
+                            actions_text += " > ";
+                            actions_text += &a.text;
+                            actions_text += " < ";
+                            actions_text += "\n\n";
+                        }
+                        for mut t in texts.q2_mut().iter_mut() {
+                            if t.sections.first().unwrap().value != actions_text {
+                                info!("Changing text in an action text component");
+                                t.sections.first_mut().unwrap().value = actions_text.clone();
+                            }
+                        }
+                    }
+                };
             }
         };
-        if player.current_rendered_bg_text != rendered_text {
-            info!("Changed rendered text");
-            for mut t in text.iter_mut() {
-                info!("Changing text in a text component");
-                t.sections.first_mut().unwrap().value = rendered_text.clone();
-            }
-            player.current_rendered_bg_text = rendered_text;
-        }
     }
 
     fn render_controls(
@@ -236,7 +318,14 @@ impl Player {
         mut player_state: ResMut<PlayerState>,
         slides: Query<&Slide>,
         egui_context: ResMut<EguiContext>,
-        mut text: Query<(&mut Text, &mut Transform), With<DisplayText>>,
+        mut texts: Query<
+            (&mut Text, &mut Transform),
+            Or<(
+                With<DisplayBackground>,
+                With<DisplayActions>,
+                With<DisplayDescription>,
+            )>,
+        >,
         mut commands: Commands,
     ) {
         let valid_slide_names: Vec<_> = slides.iter().map(|s| s.name.clone()).collect();
@@ -249,27 +338,24 @@ impl Player {
                     }
                 });
             ui.separator();
-            ui.checkbox(&mut player.render, "Render on");
-            ui.label(format!("{:#?}", *player_state));
-            if ui.button("Clear rendered text").clicked() {
-                for (mut text, mut _transform) in text.iter_mut() {
-                    text.sections.first_mut().unwrap().value = "CLEARED".into();
-                }
-            }
-            ui.separator();
-            for (mut text, mut transform) in text.iter_mut() {
-                ui.label("Text position");
-                ui.add(egui::DragValue::new(&mut transform.translation.x).speed(1.));
-                ui.add(egui::DragValue::new(&mut transform.translation.y).speed(1.));
+            //ui.checkbox(&mut player.render, "Render on");
+            //ui.label(format!("{:#?}", *player_state));
+            //ui.separator();
+            // ui.separator();
+            // for (mut text, mut transform) in texts.iter_mut() {
+            //     ui.label("Text position");
+            //     ui.add(egui::DragValue::new(&mut transform.translation.x).speed(1.));
+            //     ui.add(egui::DragValue::new(&mut transform.translation.y).speed(1.));
 
-                ui.label("Font size");
-                ui.add(
-                    egui::DragValue::new(&mut text.sections.first_mut().unwrap().style.font_size)
-                        .speed(1.)
-                        .clamp_range(6..=40),
-                );
-            }
-            ui.separator();
+            //     ui.label("Font size");
+            //     ui.add(
+            //         egui::DragValue::new(&mut text.sections.first_mut().unwrap().style.font_size)
+            //             .speed(1.)
+            //             .clamp_range(6..=40),
+            //     );
+            //     ui.separator();
+            // }
+            // ui.separator();
 
             let s = slides
                 .iter()
