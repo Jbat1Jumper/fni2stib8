@@ -181,7 +181,7 @@ impl Player {
                     "Loading",
                     TextStyle {
                         font: asset_server.load("fonts/BPtypewrite.otf"),
-                        font_size: 10.0,
+                        font_size: 12.0,
                         color: Color::WHITE,
                         //..Default::default()
                     },
@@ -191,7 +191,7 @@ impl Player {
                     },
                 ),
                 transform: Transform {
-                    translation: Vec3::new(000.0, 350.0, 0.0),
+                    translation: Vec3::new(000.0, 380.0, 0.0),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -203,7 +203,7 @@ impl Player {
                     "Description",
                     TextStyle {
                         font: asset_server.load("fonts/BPtypewrite.otf"),
-                        font_size: 10.0,
+                        font_size: 12.0,
                         color: Color::WHITE,
                         //..Default::default()
                     },
@@ -213,7 +213,7 @@ impl Player {
                     },
                 ),
                 transform: Transform {
-                    translation: Vec3::new(000.0, 0.0, 0.0),
+                    translation: Vec3::new(000.0, -30.0, 0.0),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -225,7 +225,7 @@ impl Player {
                     "Actions",
                     TextStyle {
                         font: asset_server.load("fonts/BPtypewrite.otf"),
-                        font_size: 10.0,
+                        font_size: 12.0,
                         color: Color::WHITE,
                         //..Default::default()
                     },
@@ -235,7 +235,7 @@ impl Player {
                     },
                 ),
                 transform: Transform {
-                    translation: Vec3::new(000.0, -40.0, 0.0),
+                    translation: Vec3::new(000.0, -100.0, 0.0),
                     ..Default::default()
                 },
                 ..Default::default()
