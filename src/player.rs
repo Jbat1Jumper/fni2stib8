@@ -40,6 +40,7 @@ struct Player {
     hovering_action: Option<usize>,
     dashes: usize,
     render: bool,
+    redraw_bg: bool,
     pauses: f32,
     action_pause: f32,
 }
@@ -86,6 +87,7 @@ impl Player {
                 }
             }
             PauseBetweenBgAndText(ref mut timer) => {
+                player.redraw_bg = false;
                 if timer.tick(time.delta()).just_finished() {
                     info!("PauseBetweenBgAndText finished");
                     *state = FadeInText(Timer::from_seconds(text_fade_in_duration, false))
@@ -126,6 +128,7 @@ impl Player {
                 player.amount_of_actions_shown = 1.0 - timer.percent();
                 if timer.tick(time.delta()).just_finished() {
                     info!("FadeOutTextAndActions finished");
+                    player.redraw_bg = true;
                     player.percentage_of_text_shown = 0.0;
                     player.amount_of_actions_shown = 0.0;
                     *state = FadeOutBg(Timer::from_seconds(BG_FADE_OUT, false))
@@ -157,6 +160,7 @@ impl Player {
             next_slide: "Living".into(),
             render_timer: Timer::from_seconds(0.1, true),
             render: true,
+            redraw_bg: true,
             pauses: 0.1, // 1.0
             dashes: 0,
             percentage_of_text_shown: 0.0,
@@ -216,7 +220,6 @@ impl Player {
         for CursorMoved { position, id } in cursor_moved.iter() {
             let window = windows.get(*id).unwrap();
             let position = window_to_world(window, camera, position);
-            info!("CursorMoved {:?}", position);
             let mut distances = vec![];
             for (i, _a) in slide.actions.iter().enumerate() {
                 let d =
@@ -353,11 +356,12 @@ impl Player {
                 {
                     None => warn!("background not found"),
                     Some((bg, bgd)) => {
-                        let rendered_text = convert_background_to_ascii(bg, bgd, player.bg_opacity);
-                        for mut t in texts.q0_mut().iter_mut() {
-                            if t.sections.first().unwrap().value != rendered_text {
-                                info!("Changing text in a bg_text component");
-                                t.sections.first_mut().unwrap().value = rendered_text.clone();
+                        if player.redraw_bg  {
+                            let rendered_text = convert_background_to_ascii(bg, bgd, player.bg_opacity);
+                            for mut t in texts.q0_mut().iter_mut() {
+                                if t.sections.first().unwrap().value != rendered_text {
+                                    t.sections.first_mut().unwrap().value = rendered_text.clone();
+                                }
                             }
                         }
 
@@ -368,7 +372,6 @@ impl Player {
                         );
                         for mut t in texts.q1_mut().iter_mut() {
                             if t.sections.first().unwrap().value != description_text {
-                                info!("Changing text in a desc_text component");
                                 t.sections.first_mut().unwrap().value = description_text.clone();
                             }
                         }
@@ -392,7 +395,6 @@ impl Player {
                         }
                         for mut t in texts.q2_mut().iter_mut() {
                             if t.sections.first().unwrap().value != actions_text {
-                                info!("Changing text in an action text component");
                                 t.sections.first_mut().unwrap().value = actions_text.clone();
                             }
                         }
