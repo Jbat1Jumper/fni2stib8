@@ -1,57 +1,108 @@
-use serde::*;
 use crate::model::EditorsOpen;
-use std::{
-    io::Read,
-    path::Path,
-    thread::{spawn, JoinHandle},
-};
+use serde::*;
+use std::path::Path;
 
-use bevy::{
-    prelude::*,
-    render::texture::{Extent3d, ImageType, TextureDimension, TextureFormat},
-};
+use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext};
 use image::{GenericImageView, RgbaImage};
 
 const WIDTH: u32 = 128;
 const HEIGHT: u32 = WIDTH / 4;
 
-fn load_from_bytes(bytes: &[u8]) -> (RgbaImage, Texture) {
-    let reader = image::io::Reader::new(std::io::Cursor::new(bytes))
-        .with_guessed_format()
-        .expect("Cursor never fails");
-    let image = reader
-        .decode()
-        .expect("Failed to decode image")
-        .resize_to_fill(WIDTH, HEIGHT * 2, image::imageops::FilterType::Nearest)
-        .resize_exact(WIDTH, HEIGHT, image::imageops::FilterType::Nearest)
-        .to_rgba8();
-    let data: Vec<u8> = image.pixels().map(|p| &p.0).flatten().cloned().collect();
-    let size = image.dimensions();
-    (
-        image,
-        Texture::new_fill(
-            Extent3d::new(size.0, size.1, 1),
-            TextureDimension::D2,
-            &data,
-            TextureFormat::Rgba8UnormSrgb,
-        ),
+#[cfg(target_arch = "wasm32")]
+mod load {
+    use bevy::{
+        prelude::*,
+        render::texture::{Extent3d, ImageType, TextureDimension, TextureFormat},
+    };
+    use image::{GenericImageView, RgbaImage};
+    use std::sync::mpsc::{channel, Receiver, Sender};
+    pub fn request_image(url: String, sender: Sender<(String, RgbaImage, Texture)>) {
+        panic!("Cant request image");
+    }
+}
+
+pub fn url_2_filename(url: String) -> String {
+    format!(
+        "./assets/images/{}",
+        url.replace(":", "").replace("/", "_").replace("?", "").replace("#", "")
     )
 }
 
-fn load_from_response(response: ureq::Response) -> (RgbaImage, Texture) {
-    let len = response
-        .header("Content-Length")
-        .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or_default();
-    let mut bytes: Vec<u8> = Vec::with_capacity(len);
-    response
-        .into_reader()
-        .take(len as u64 * 2)
-        .read_to_end(&mut bytes)
-        .expect("Could not read to end");
-    load_from_bytes(&bytes)
+#[cfg(not(target_arch = "wasm32"))]
+mod load {
+    use super::{HEIGHT, WIDTH};
+    use image::{GenericImageView, RgbaImage};
+    use std::{fs::File, path::PathBuf, sync::mpsc::{channel, Receiver, Sender}};
+    use std::{
+        io::Read,
+        path::Path,
+        thread::{spawn, JoinHandle},
+    };
+
+    use bevy::{
+        prelude::*,
+        render::texture::{Extent3d, ImageType, TextureDimension, TextureFormat},
+    };
+    fn load_from_bytes(bytes: &[u8]) -> (RgbaImage, Texture) {
+        let reader = image::io::Reader::new(std::io::Cursor::new(bytes))
+            .with_guessed_format()
+            .expect("Cursor never fails");
+        let image = reader
+            .decode()
+            .expect("Failed to decode image")
+            .resize_to_fill(WIDTH, HEIGHT * 2, image::imageops::FilterType::Nearest)
+            .resize_exact(WIDTH, HEIGHT, image::imageops::FilterType::Nearest)
+            .to_rgba8();
+        let data: Vec<u8> = image.pixels().map(|p| &p.0).flatten().cloned().collect();
+        let size = image.dimensions();
+        (
+            image,
+            Texture::new_fill(
+                Extent3d::new(size.0, size.1, 1),
+                TextureDimension::D2,
+                &data,
+                TextureFormat::Rgba8UnormSrgb,
+            ),
+        )
+    }
+
+    fn load_from_response(response: ureq::Response, url: String) -> (RgbaImage, Texture) {
+        let len = response
+            .header("Content-Length")
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or_default();
+        let mut bytes: Vec<u8> = Vec::with_capacity(len);
+        response
+            .into_reader()
+            .take(len as u64 * 2)
+            .read_to_end(&mut bytes)
+            .expect("Could not read to end");
+
+        {
+            use std::io::Write;
+            let dest = super::url_2_filename(url);
+            info!("Writing image to {}", dest);
+            let dest: PathBuf = dest.into();
+            let mut f = File::create(dest).expect("Failed to write to resources file");
+            f.write_all(&bytes).expect("Failed to write all to file");
+        }
+
+        load_from_bytes(&bytes)
+    }
+    pub fn request_image(url: String, sender: Sender<(String, RgbaImage, Texture)>) {
+        spawn(move || {
+            info!("Requesting image from {}", url);
+            let response = ureq::get(&url).call().expect("Failed to request image");
+            let (i, t) = load_from_response(response, url.clone());
+            sender
+                .send((url, i, t))
+                .expect("Failed to send the loaded image");
+        });
+    }
 }
+
+use load::*;
 
 use std::sync::mpsc::{channel, Receiver, Sender};
 
@@ -60,17 +111,6 @@ use crate::{
     model::CrudEvent,
     persistence::{Persistable, PersistenceEvent},
 };
-
-fn request_image(url: String, sender: Sender<(String, RgbaImage, Texture)>) -> JoinHandle<()> {
-    spawn(move || {
-        info!("Requesting image from {}", url);
-        let response = ureq::get(&url).call().expect("Failed to request image");
-        let (i, t) = load_from_response(response);
-        sender
-            .send((url, i, t))
-            .expect("Failed to send the loaded image");
-    })
-}
 
 pub struct ImagesPlugin;
 

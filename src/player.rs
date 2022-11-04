@@ -19,6 +19,7 @@ impl Plugin for PlayerPlugin {
             )))
             .add_startup_system(Player::startup.system())
             .add_system(Player::render.system())
+            .add_system(Player::render_controls.system())
             .add_system(Player::handle_mouse.system())
             .add_system(Player::update_state.system())
             .add_system(Player::handle_renames.system());
@@ -158,7 +159,7 @@ impl Player {
         Self {
             current_slide: "Living".into(),
             next_slide: "Living".into(),
-            render_timer: Timer::from_seconds(0.1, true),
+            render_timer: Timer::from_seconds(0.3, true),
             render: true,
             redraw_bg: true,
             pauses: 0.1, // 1.0
@@ -429,8 +430,8 @@ impl Player {
                     }
                 });
             ui.separator();
-            //ui.checkbox(&mut player.render, "Render on");
-            //ui.label(format!("{:#?}", *player_state));
+            ui.checkbox(&mut player.render, "Render on");
+            ui.label(format!("{:#?}", *player_state));
             //ui.separator();
             // ui.separator();
             // for (mut text, mut transform) in texts.iter_mut() {
